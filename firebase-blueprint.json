@@ -1,0 +1,63 @@
+{
+  "entities": {
+    "Order": {
+      "title": "Order",
+      "description": "A customer order placed from a table.",
+      "type": "object",
+      "properties": {
+        "cafeId": {
+          "type": "string",
+          "description": "The ID of the cafe where the order was placed."
+        },
+        "tableNumber": {
+          "type": "string",
+          "description": "The table number from the QR code."
+        },
+        "customerName": {
+          "type": "string",
+          "description": "The name of the customer."
+        },
+        "numberOfCustomers": {
+          "type": "number",
+          "description": "The number of people at the table."
+        },
+        "items": {
+          "type": "array",
+          "description": "The list of dishes ordered.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "dishId": { "type": "string" },
+              "name": { "type": "string" },
+              "price": { "type": "number" },
+              "quantity": { "type": "number" }
+            }
+          }
+        },
+        "totalAmount": {
+          "type": "number",
+          "description": "The total cost of the order."
+        },
+        "status": {
+          "type": "string",
+          "enum": ["pending", "preparing", "completed", "cancelled"],
+          "description": "The current status of the order."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When the order was placed."
+        }
+      },
+      "required": ["cafeId", "tableNumber", "customerName", "numberOfCustomers", "items", "totalAmount", "status", "createdAt"]
+    }
+  },
+  "firestore": {
+    "orders/{orderId}": {
+      "schema": {
+        "$ref": "#/entities/Order"
+      },
+      "description": "Stores all customer orders."
+    }
+  }
+}

@@ -1,0 +1,65 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: orders
+    // Document ID: auto-generated
+    // Fields:
+    //   - cafeId: string (required)
+    //   - tableNumber: string (required)
+    //   - customerName: string (required)
+    //   - numberOfCustomers: number (required)
+    //   - items: list (required)
+    //   - totalAmount: number (required)
+    //   - status: string (required, enum: pending, preparing, completed, cancelled)
+    //   - createdAt: timestamp (required)
+    //
+    // ===============================================================
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function hasRequiredOrderFields() {
+      return request.resource.data.keys().hasAll([
+        'cafeId', 'tableNumber', 'customerName', 'numberOfCustomers', 
+        'items', 'totalAmount', 'status', 'createdAt'
+      ]);
+    }
+
+    function isValidOrder() {
+      return hasRequiredOrderFields() &&
+        request.resource.data.cafeId is string &&
+        request.resource.data.tableNumber is string &&
+        request.resource.data.customerName is string &&
+        request.resource.data.customerName.size() > 0 &&
+        request.resource.data.customerName.size() < 100 &&
+        request.resource.data.numberOfCustomers is number &&
+        request.resource.data.numberOfCustomers > 0 &&
+        request.resource.data.items is list &&
+        request.resource.data.items.size() > 0 &&
+        request.resource.data.items.size() < 50 &&
+        request.resource.data.totalAmount is number &&
+        request.resource.data.totalAmount >= 0 &&
+        request.resource.data.status in ['pending', 'preparing', 'completed', 'cancelled'] &&
+        request.resource.data.createdAt is timestamp;
+    }
+
+    match /orders/{orderId} {
+      // Allow anyone to create an order (since customers scan QR codes without logging in)
+      // In a real app, you might want anonymous auth, but for this demo, we allow open creation
+      allow create: if isValidOrder();
+      
+      // Allow reading and updating if authenticated (restaurant staff)
+      // Or allow reading if the order was just created (for customer confirmation, though we might not need it)
+      allow read: if true; // Open read for demo purposes so the restaurant dashboard works without complex auth setup
+      allow update: if true; // Open update for demo purposes so the restaurant can change status
+      allow delete: if false;
+    }
+  }
+}
