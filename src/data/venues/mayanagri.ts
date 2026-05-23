@@ -1335,8 +1335,7 @@ export const data: Cafe = {
       "id": "mg-crunchy-asparagus",
       "name": "Crunchy Asparagus",
       "price": 425,
-      "category": "BAO(12 PM TO 11 PM)",
-      "arEnabled": true
+      "category": "BAO(12 PM TO 11 PM)"
     },
     {
       "id": "mg-crunchy-paneer-bao",

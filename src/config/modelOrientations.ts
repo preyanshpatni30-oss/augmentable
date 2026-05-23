@@ -43,10 +43,11 @@ export const MODEL_ORIENTATIONS: Record<string, string> = {
   'mg-thai-herbs': '-90deg 0deg 0deg',
   'mg-shiitake-button-mushroom': '-90deg 0deg 0deg',
 
-  // Bao — same Y-axis correction as crunchy-paneer-bao
-  'mg-crunchy-asparagus': '0deg -90deg 0deg',
-  'mg-cottage-cheese-sun-dried-tomato': '0deg -90deg 0deg',
-  'mg-tempura-crunchy-vegetable': '0deg -90deg 0deg',
+  // Bao — X-axis correction (same export pipeline as dim sum)
+  // mg-crunchy-asparagus intentionally omitted: R2 file has wrong content (sushi model)
+  'mg-crunchy-asparagus': '-90deg 0deg 0deg',
+  'mg-cottage-cheese-sun-dried-tomato': '-90deg 0deg 0deg',
+  'mg-tempura-crunchy-vegetable': '-90deg 0deg 0deg',
 
   // Street food & combo plates
   'mg-raj-kachori': '-90deg 0deg 0deg',
