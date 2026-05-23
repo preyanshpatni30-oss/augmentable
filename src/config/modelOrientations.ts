@@ -19,20 +19,19 @@ export const MODEL_ORIENTATIONS: Record<string, string> = {
   'mg-enoki-mushroom-sushi': '0deg -90deg 0deg',
   'mg-crispy-chives': '0deg -90deg 0deg',
 
-  // Healthy bowls — X-axis correction: bowls exported with opening facing -Y need -90° pitch
-  // If bowl still appears wrong, try '90deg 0deg 0deg' (reverse pitch)
-  'mg-buddha-bowl': '-90deg 0deg 0deg',
-  'mg-burrito-bowl': '-90deg 0deg 0deg',
-  'mg-muesli-bowl': '-90deg 0deg 0deg',
-  'mg-roasted-veggies-quinoa-bowl': '-90deg 0deg 0deg',
-  'mg-fresh-fruit-bowl': '-90deg 0deg 0deg',
+  // Healthy bowls — opening already faces +Y in export, no rotation needed
+  'mg-buddha-bowl': '0deg 0deg 0deg',
+  'mg-burrito-bowl': '0deg 0deg 0deg',
+  'mg-muesli-bowl': '0deg 0deg 0deg',
+  'mg-roasted-veggies-quinoa-bowl': '0deg 0deg 0deg',
+  'mg-fresh-fruit-bowl': '0deg 0deg 0deg',
 
-  // Risotto — wide shallow bowl, same X-axis correction as healthy bowls
-  'mg-risotto-zucchini-and-bell-peppers': '-90deg 0deg 0deg',
-  'mg-risotto-sun-dried-tomato': '-90deg 0deg 0deg',
-  'mg-risotto-mushroom': '-90deg 0deg 0deg',
-  'mg-risotto-green': '-90deg 0deg 0deg',
-  'mg-risotto-three-cheese': '-90deg 0deg 0deg',
+  // Risotto — wide shallow bowl, same as healthy bowls
+  'mg-risotto-zucchini-and-bell-peppers': '0deg 0deg 0deg',
+  'mg-risotto-sun-dried-tomato': '0deg 0deg 0deg',
+  'mg-risotto-mushroom': '0deg 0deg 0deg',
+  'mg-risotto-green': '0deg 0deg 0deg',
+  'mg-risotto-three-cheese': '0deg 0deg 0deg',
 
   // Dim sum — dumplings, try same -90° X correction; swap to '90deg 0deg 0deg' if inverted
   'mg-truffle-edamame-cheese': '-90deg 0deg 0deg',
