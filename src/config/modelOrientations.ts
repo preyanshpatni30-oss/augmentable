@@ -33,25 +33,25 @@ export const MODEL_ORIENTATIONS: Record<string, string> = {
   'mg-risotto-green': '0deg 0deg 0deg',
   'mg-risotto-three-cheese': '0deg 0deg 0deg',
 
-  // Dim sum — dumplings, try same -90° X correction; swap to '90deg 0deg 0deg' if inverted
-  'mg-truffle-edamame-cheese': '-90deg 0deg 0deg',
-  'mg-beetroot-bamboo-shoot': '-90deg 0deg 0deg',
-  'mg-thai-asparagus': '-90deg 0deg 0deg',
-  'mg-water-chestnut-cream-cheese': '-90deg 0deg 0deg',
-  'mg-cheese-chilli': '-90deg 0deg 0deg',
-  'mg-thai-herbs': '-90deg 0deg 0deg',
-  'mg-shiitake-button-mushroom': '-90deg 0deg 0deg',
+  // Dim sum — food surface already faces +Y in export, no rotation needed
+  'mg-truffle-edamame-cheese': '0deg 0deg 0deg',
+  'mg-beetroot-bamboo-shoot': '0deg 0deg 0deg',
+  'mg-thai-asparagus': '0deg 0deg 0deg',
+  'mg-water-chestnut-cream-cheese': '0deg 0deg 0deg',
+  'mg-cheese-chilli': '0deg 0deg 0deg',
+  'mg-thai-herbs': '0deg 0deg 0deg',
+  'mg-shiitake-button-mushroom': '0deg 0deg 0deg',
 
-  // Bao — X-axis correction (same export pipeline as dim sum)
+  // Bao — same export pipeline as dim sum, food already faces +Y
   // mg-crunchy-asparagus intentionally omitted: R2 file has wrong content (sushi model)
-  'mg-crunchy-asparagus': '-90deg 0deg 0deg',
-  'mg-cottage-cheese-sun-dried-tomato': '-90deg 0deg 0deg',
-  'mg-tempura-crunchy-vegetable': '-90deg 0deg 0deg',
+  'mg-crunchy-asparagus': '0deg 0deg 0deg',
+  'mg-cottage-cheese-sun-dried-tomato': '0deg 0deg 0deg',
+  'mg-tempura-crunchy-vegetable': '0deg 0deg 0deg',
 
   // Street food & combo plates
-  'mg-raj-kachori': '-90deg 0deg 0deg',
-  'mg-khow-suey-rice-noodles': '-90deg 0deg 0deg',
-  'mg-cottage-cheese-steak-spinach-rice': '-90deg 0deg 0deg',
+  'mg-raj-kachori': '0deg 0deg 0deg',
+  'mg-khow-suey-rice-noodles': '0deg 0deg 0deg',
+  'mg-cottage-cheese-steak-spinach-rice': '0deg 0deg 0deg',
 };
 
 /**
