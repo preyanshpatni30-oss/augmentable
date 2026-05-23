@@ -1226,7 +1226,7 @@ export const data: Cafe = {
       "arEnabled": true
     },
     {
-      "id": "mg-avocado-roll",
+      "id": "mg-avacado-roll",
       "name": "Avocado Roll",
       "price": 575,
       "category": "SUSHI(12 PM TO 11 PM)",
@@ -1296,7 +1296,7 @@ export const data: Cafe = {
       "arEnabled": true
     },
     {
-      "id": "mg-thai-herbs",
+      "id": "mg-thai-herb",
       "name": "Thai Herbs",
       "price": 425,
       "category": "DIM SUM(12 PM TO 11 PM)",
@@ -1328,6 +1328,7 @@ export const data: Cafe = {
       "name": "Enoki Mushroom",
       "price": 425,
       "category": "BAO(12 PM TO 11 PM)",
+      "arEnabled": true
 
     },
     {

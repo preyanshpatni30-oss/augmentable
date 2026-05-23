@@ -1,85 +1,104 @@
 import { useState, useCallback } from 'react';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
-// Security: never call Gemini directly from the browser with an API key.
-// The hook intentionally uses local fallbacks until a server-side proxy or
-// Cloud Function is available to keep the key private.
-
-/**
- * Dynamically constructs a highly realistic flavor profile and tasting note
- * based on context clues in the dish name and description. Used as a high-fidelity fallback.
- */
-const getDynamicFallbackProfile = (dishName: string, dishDescription: string) => {
-  const desc = (dishName + ' ' + dishDescription).toLowerCase();
-  
-  let notes: { label: string; percentage: number }[] = [];
-  let tastingNote = "";
-
-  if (desc.includes('chocolate') || desc.includes('sweet') || desc.includes('cake') || desc.includes('brownie') || desc.includes('nutella') || desc.includes('frappe') || desc.includes('latte')) {
-    notes = [
-      { label: "Sweetness", percentage: 60 },
-      { label: "Richness", percentage: 30 },
-      { label: "Warmth", percentage: 10 }
-    ];
-    tastingNote = `An indulgent and comforting sweet profile with notes of velvety richness and deep satisfaction.`;
-  } else if (desc.includes('coffee') || desc.includes('espresso') || desc.includes('brew') || desc.includes('bitter')) {
-    notes = [
-      { label: "Boldness", percentage: 50 },
-      { label: "Aroma", percentage: 35 },
-      { label: "Acidity", percentage: 15 }
-    ];
-    tastingNote = `A bold, aromatic profile with a sophisticated balance of dark-roasted undertones and subtle brightness.`;
-  } else if (desc.includes('chicken') || desc.includes('steak') || desc.includes('pizza') || desc.includes('pesto') || desc.includes('gnocchi') || desc.includes('savory') || desc.includes('cheese') || desc.includes('paneer') || desc.includes('nachos')) {
-    notes = [
-      { label: "Savory", percentage: 55 },
-      { label: "Herbed", percentage: 25 },
-      { label: "Umami", percentage: 20 }
-    ];
-    tastingNote = `A deeply savory profile highlighted by aromatic herbs and a satisfying umami finish.`;
-  } else if (desc.includes('salad') || desc.includes('matcha') || desc.includes('green') || desc.includes('fresh') || desc.includes('citrus')) {
-    notes = [
-      { label: "Freshness", percentage: 50 },
-      { label: "Zest", percentage: 30 },
-      { label: "Earthy", percentage: 20 }
-    ];
-    tastingNote = `A vibrant and crisp sensory profile that offers outstanding freshness and a clean, refreshing finish.`;
-  } else {
-    notes = [
-      { label: "Savory", percentage: 45 },
-      { label: "Earthy", percentage: 30 },
-      { label: "Zesty", percentage: 25 }
-    ];
-    tastingNote = `A harmonious and well-rounded combination of pleasant aroma and beautifully integrated flavors.`;
-  }
-
-  return { notes, tastingNote };
-};
+// SECURITY WARNING: In a production application, your API key should NEVER be exposed 
+// in the client-side code. This can lead to unauthorized billing and usage.
+//
+// RECOMMENDED PATTERN:
+// 1. Create a server-side endpoint (e.g., /api/recommendations)
+// 2. Keep your API_KEY as an environment variable on that server.
+// 3. The client calls your server, which then calls Gemini and returns the result.
+//
+const API_KEY = import.meta.env.VITE_GEMINI_API_KEY || '';
+const genAI = new GoogleGenerativeAI(API_KEY);
 
 export const useGemini = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const generateRecommendations = useCallback(async (cafeName: string, tagline: string, menu: any[]) => {
-    console.warn("Gemini recommendations require a server-side proxy. Falling back to static logic.");
-    return null;
+    if (!API_KEY) return null;
+
+    setLoading(true);
+    try {
+      const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+      const prompt = `
+        You are the Head Chef at "${cafeName}" (${tagline}). 
+        Menu: ${JSON.stringify(menu.map(d => ({ name: d.name, description: d.description || '' })))}
+        Select 3 items to feature on the "Chef's Board". 
+        Return ONLY a JSON array of 3 objects with keys "name" and "reason" (max 5 words).
+      `;
+      const result = await model.generateContent(prompt);
+      const text = (await result.response).text();
+      const jsonMatch = text.match(/\[.*\]/s);
+      return jsonMatch ? JSON.parse(jsonMatch[0]) : null;
+    } catch (err) {
+      console.error("Gemini Recommendations Error:", err);
+      return null;
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  const generateFlavorProfile = useCallback(async (dishName: string, dishDescription: string) => {
+  const generateFlavorProfile = useCallback(async (dishName: string, dishDescription: string = '') => {
+    if (!API_KEY) return null;
+
     setLoading(true);
-    console.log("🤖 Gemini: Analyzing Flavor for", dishName);
+    try {
+      const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+      const prompt = `
+        Analyze this dish: "${dishName}" - "${dishDescription}".
+        Provide 3 primary flavor notes and a percentage for each (total 100%).
+        Also provide a one-sentence tasting note.
+        Return ONLY a JSON object: {"notes": [{"label": "string", "percentage": number}], "tastingNote": "string"}
+      `;
+      const result = await model.generateContent(prompt);
+      const text = (await result.response).text();
+      const jsonMatch = text.match(/\{.*\}/s);
+      return jsonMatch ? JSON.parse(jsonMatch[0]) : null;
+    } catch (err) {
+      console.error("Gemini Flavor Error:", err);
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const askTheChef = useCallback(async (dishName: string, dishDescription: string = '', cafeName: string, question: string) => {
+    setLoading(true);
     
-    await new Promise(resolve => setTimeout(resolve, 800)); // Smooth animation simulation
-    setLoading(false);
-    return getDynamicFallbackProfile(dishName, dishDescription);
+    if (!API_KEY) {
+      await new Promise(resolve => setTimeout(resolve, 800));
+      setLoading(false);
+      return "The kitchen is currently in a frenzy! (API Key missing). I can tell you this dish is made with love.";
+    }
+
+    try {
+      const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+      const prompt = `
+        You are the Executive Chef at "${cafeName}". You are passionate and deeply knowledgeable.
+        Dish: "${dishName}"
+        Description: "${dishDescription}"
+        Customer Question: "${question}"
+
+        Task: Answer the customer's question as the Chef. Be helpful, concise, and stay in character.
+        If they ask about allergens or ingredients, use the description to infer.
+        Answer under 50 words.
+      `;
+
+      const result = await model.generateContent(prompt);
+      const response = await result.response;
+      return response.text();
+    } catch (err: any) {
+      console.error("Gemini Chef Error:", err);
+      // Detailed fallback message to help debug if it fails again
+      const msg = err.message || "Unknown error";
+      if (msg.includes("API key")) return "My apologies, but my secret ingredients (API Key) seem to be misplaced!";
+      return "The kitchen is truly chaotic right now! Could you ask me again in a moment?";
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  const askTheChef = useCallback(async (dishName: string, dishDescription: string, cafeName: string, question: string) => {
-    setLoading(true);
-    console.log("👨‍🍳 Gemini: Chef is answering question for", dishName);
-
-    await new Promise(resolve => setTimeout(resolve, 800));
-    setLoading(false);
-    return `Ah, the kitchen is wonderfully chaotic right now! As far as my ${dishName} goes, I can tell you that it's prepared with extraordinary care and only the highest quality ingredients. It is a true specialty here at ${cafeName}!`;
-  }, []);
-
-  return { generateRecommendations, generateFlavorProfile, askTheChef, loading, error };
+  return { generateRecommendations, generateFlavorProfile, askTheChef, loading, error, isConfigured: !!API_KEY };
 };

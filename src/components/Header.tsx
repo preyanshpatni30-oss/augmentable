@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
-import { Cafe } from '../data';
+import { Cafe } from '../data/types';
 import { Sparkles } from 'lucide-react';
 import { getThemeColors } from '../themeConfig';
+import { useMagnetic } from '../hooks/useMagnetic';
 
 interface HeaderProps {
   cafe: Cafe;
@@ -34,6 +35,9 @@ export const Header: React.FC<HeaderProps> = ({ cafe, tableNumber }) => {
     }
   };
 
+  const menuButton = useMagnetic(0.2);
+  const chefButton = useMagnetic(0.2);
+
   return (
     <header className="relative z-10 pt-6 pb-12 px-6 overflow-hidden">
       <div className="absolute inset-0 -z-10">
@@ -54,13 +58,13 @@ export const Header: React.FC<HeaderProps> = ({ cafe, tableNumber }) => {
         transition={{ duration: 1, ease: [0.23, 1, 0.32, 1] }}
         className="max-w-7xl mx-auto space-y-12"
       >
-        <div className="flex flex-col gap-12 lg:grid lg:grid-cols-[1.3fr_0.8fr] lg:items-end">
+        <div className="flex flex-col gap-12">
           <div className="space-y-8">
             <div className="space-y-4">
-              <h1 className="text-5xl md:text-7xl font-serif italic text-white leading-[1.03] tracking-tight">
+              <h1 className="text-4xl font-serif italic text-white leading-[1.03] tracking-tight">
                 Immersive tasting for <span style={{ color: `rgba(${t.lightRgb}, 0.9)` }}>{cafe.name}</span>
               </h1>
-              <p className="text-white/70 text-lg md:text-xl font-light max-w-2xl leading-relaxed">
+              <p className="text-white/70 text-base font-light max-w-2xl leading-relaxed">
                 {cafe.tagline} — contactless ordering with chef-led spotlights in one calm surface.
               </p>
             </div>
@@ -68,8 +72,10 @@ export const Header: React.FC<HeaderProps> = ({ cafe, tableNumber }) => {
 
             <div className="flex flex-wrap gap-4">
               <button
+                ref={menuButton.ref}
                 type="button"
                 onClick={() => handleNavigate('menu')}
+                style={menuButton.transformStyle}
                 className={`inline-flex items-center gap-3 px-8 py-4 rounded-2xl font-semibold tracking-wide transition-all duration-500 hover:-translate-y-1 ${
                   activeSection === 'menu'
                     ? 'bg-white text-black shadow-[0_20px_60px_rgba(255,255,255,0.2)]'
@@ -79,17 +85,21 @@ export const Header: React.FC<HeaderProps> = ({ cafe, tableNumber }) => {
                 Explore Menu
               </button>
               <button
+                ref={chefButton.ref}
                 type="button"
                 onClick={() => handleNavigate('chef')}
+                style={{
+                  ...chefButton.transformStyle,
+                  ...(activeSection === 'chef' ? {
+                    backgroundColor: `rgb(${t.accentRgb})`,
+                    boxShadow: `0 20px 60px rgba(${t.primaryRgb}, 0.3)`
+                  } : {})
+                }}
                 className={`inline-flex items-center gap-3 px-8 py-4 rounded-2xl font-semibold tracking-wide transition-all duration-500 hover:-translate-y-1 ${
                   activeSection === 'chef'
                     ? 'text-black'
                     : 'glass-liquid text-white hover:bg-white/10'
                 }`}
-                style={activeSection === 'chef' ? {
-                  backgroundColor: `rgb(${t.accentRgb})`,
-                  boxShadow: `0 20px 60px rgba(${t.primaryRgb}, 0.3)`
-                } : undefined}
               >
                 Chef's Board
               </button>
@@ -129,7 +139,7 @@ export const Header: React.FC<HeaderProps> = ({ cafe, tableNumber }) => {
                 <div className="pt-6 border-t border-white/5 flex items-center justify-between">
                    <div className="flex items-center gap-4">
                      <div className="h-14 w-14 rounded-2xl glass-liquid flex items-center justify-center text-2xl font-serif text-white">
-                       {cafe.menu.length}
+                       {cafe.menu.filter(d => d.arEnabled === true).length}
                      </div>
                      <div>
                        <p className="text-[10px] text-white/40 uppercase tracking-widest">AR Ready</p>

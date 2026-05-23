@@ -56,10 +56,11 @@ export const DishCard = memo<DishCardProps>(({ dish, cafeId, cafeName, index, th
   const [modelLoadingState, setModelLoadingState] = useState<'idle' | 'loading' | 'loaded' | 'error'>('idle');
   const [pendingARLaunch, setPendingARLaunch] = useState(false);
   const [arSessionStatus, setArSessionStatus] = useState<'idle' | 'active' | 'placed' | 'failed'>('idle');
+  const [modelUnavailable, setModelUnavailable] = useState(false);
   const [rotateX, setRotateX] = useState(0);
   const [rotateY, setRotateY] = useState(0);
   const { gamma, beta } = useMotion();
-  const { generateFlavorProfile, askTheChef, loading: aiLoading } = useGemini();
+  const { generateFlavorProfile, askTheChef, loading: aiLoading, isConfigured: geminiConfigured } = useGemini();
   
   const t = useMemo(() => getThemeColors(themeColor), [themeColor]);
   
@@ -109,6 +110,10 @@ export const DishCard = memo<DishCardProps>(({ dish, cafeId, cafeName, index, th
       setModelLoaded(true);
       setModelLoadingState('loaded');
     } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      if (msg.includes('404') || msg.includes('Not Found')) {
+        setModelUnavailable(true);
+      }
       console.warn(`Could not preload model for ${dish.name}:`, error);
       setModelLoadingState('error');
       setIsLaunching(false);
@@ -133,6 +138,7 @@ export const DishCard = memo<DishCardProps>(({ dish, cafeId, cafeName, index, th
     setModelProgressInfo({ progress: 0, loaded: 0, total: 0, fromCache: false });
     setModelLoadingState('idle');
     setPendingARLaunch(false);
+    setModelUnavailable(false);
   }, [glbUrl]);
 
   // Clean up progress subscription on unmount or URL change
@@ -244,6 +250,10 @@ export const DishCard = memo<DishCardProps>(({ dish, cafeId, cafeName, index, th
       setFlavorProfile(profile);
       setShowFlavor(true);
       setShowChefChat(false);
+    } else {
+      // No API key or API failed — show chef chat as fallback
+      setShowChefChat(true);
+      setShowFlavor(false);
     }
   }, [flavorProfile, showFlavor, dish.name, dish.description, generateFlavorProfile]);
 
@@ -489,7 +499,7 @@ export const DishCard = memo<DishCardProps>(({ dish, cafeId, cafeName, index, th
            />
         </div>
 
-        {dish.arEnabled === true && (
+        {dish.arEnabled === true && !modelUnavailable && (
           <div className="relative h-64 w-full shrink-0 group-hover/card:scale-105 transition-transform duration-700" style={{ transform: "translateZ(25px)" }}>
             <div className="absolute inset-0 bg-gradient-to-t from-[#020204] via-transparent to-transparent z-10 pointer-events-none" />
 
@@ -629,9 +639,14 @@ export const DishCard = memo<DishCardProps>(({ dish, cafeId, cafeName, index, th
 
                 <div className="flex-1 overflow-y-auto mb-4 space-y-4 scrollbar-hide">
                   {!chefResponse && !chefLoading && (
-                    <p className="text-white/40 text-xs italic text-center py-4">
-                      Curious about ingredients? Just ask.
-                    </p>
+                    <div className="text-center py-4 space-y-1">
+                      <p className="text-white/40 text-xs italic">
+                        {geminiConfigured ? 'Curious about ingredients? Just ask.' : 'Ask about this dish — chef will respond.'}
+                      </p>
+                      {!geminiConfigured && (
+                        <p className="text-white/20 text-[10px] font-mono uppercase tracking-widest">Gemini API key not set</p>
+                      )}
+                    </div>
                   )}
                   
                   {chefLoading && (
@@ -667,7 +682,7 @@ export const DishCard = memo<DishCardProps>(({ dish, cafeId, cafeName, index, th
 
           
         <div className="absolute top-4 right-4 z-[100] flex flex-col gap-2">
-          {dish.arEnabled === true && (
+          {dish.arEnabled === true && !modelUnavailable && (
             <button
               onClick={handleShare}
               className="p-3 rounded-full bg-white/20 backdrop-blur-3xl border border-white/30 text-white shadow-[0_0_30px_rgba(255,255,255,0.1)] transition-all active:scale-95"
@@ -692,7 +707,7 @@ export const DishCard = memo<DishCardProps>(({ dish, cafeId, cafeName, index, th
               ₹{dish.price.toFixed(2)}
             </p>
 
-            {dish.arEnabled === true && (
+            {dish.arEnabled === true && !modelUnavailable && (
               <div className="flex gap-3">
                 <button
                   onClick={arSessionStatus === 'failed'

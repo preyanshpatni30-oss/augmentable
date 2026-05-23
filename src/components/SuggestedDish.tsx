@@ -1,9 +1,10 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { Cafe, Dish } from '../data';
+import { Cafe, Dish } from '../data/types';
 import { DishCard } from './DishCard';
 import { Sparkles, ChevronLeft, ChevronRight } from 'lucide-react';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 import { getThemeColors } from '../themeConfig';
+import { useGemini } from '../hooks/useGemini';
 
 interface SuggestedDishProps {
   cafe: Cafe;
@@ -11,35 +12,37 @@ interface SuggestedDishProps {
 
 export const SuggestedDish: React.FC<SuggestedDishProps> = ({ cafe }) => {
   const [suggestedDishes, setSuggestedDishes] = useState<{dish: Dish, reason: string}[]>([]);
+  const { generateRecommendations, loading } = useGemini();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const t = getThemeColors(cafe.themeColor);
 
   useEffect(() => {
-    const recommendations: {dish: Dish, reason: string}[] = [];
-    const items = cafe.menu;
-    
-    // Pick 3 diverse items
-    if (items.length > 0) {
-      recommendations.push({
-        dish: items[0],
-        reason: "Chef's Signature"
-      });
-    }
-    if (items.length > 2) {
-      recommendations.push({
-        dish: items[2],
-        reason: "Most Popular"
-      });
-    }
-    if (items.length > 4) {
-      recommendations.push({
-        dish: items[4],
-        reason: "Featured Special"
-      });
-    }
-    
-    setSuggestedDishes(recommendations);
-  }, [cafe]);
+    const fetchAIRecommendations = async () => {
+      const aiResults = await generateRecommendations(cafe.name, cafe.tagline, cafe.menu);
+      
+      if (aiResults && aiResults.length > 0) {
+        const mapped = aiResults.map((res: any) => {
+          const dish = cafe.menu.find(d => d.name.toLowerCase() === res.name.toLowerCase());
+          return dish ? { dish, reason: res.reason } : null;
+        }).filter(Boolean);
+
+        if (mapped.length > 0) {
+          setSuggestedDishes(mapped);
+          return;
+        }
+      }
+
+      // Fallback to static logic if AI fails or key is missing
+      const recommendations: {dish: Dish, reason: string}[] = [];
+      const items = cafe.menu;
+      if (items.length > 0) recommendations.push({ dish: items[0], reason: "Chef's Signature" });
+      if (items.length > 2) recommendations.push({ dish: items[2], reason: "Most Popular" });
+      if (items.length > 4) recommendations.push({ dish: items[4], reason: "Featured Special" });
+      setSuggestedDishes(recommendations);
+    };
+
+    fetchAIRecommendations();
+  }, [cafe, generateRecommendations]);
 
   const scroll = (direction: 'left' | 'right') => {
     if (scrollContainerRef.current) {
@@ -63,7 +66,7 @@ export const SuggestedDish: React.FC<SuggestedDishProps> = ({ cafe }) => {
         <div className="absolute inset-0 pointer-events-none opacity-40" style={{background: `radial-gradient(circle at 12% 20%, rgba(${t.primaryRgb},0.12), transparent 35%)`}} />
         <div className="absolute inset-0 pointer-events-none opacity-25" style={{background: 'linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px), linear-gradient(0deg, rgba(255,255,255,0.05) 1px, transparent 1px)', backgroundSize: '80px 80px'}} />
 
-        <div className="relative p-6 md:p-8">
+        <div className="relative p-6">
           <motion.div 
             initial={{ opacity: 0, x: -20 }}
             whileInView={{ opacity: 1, x: 0 }}
@@ -76,6 +79,22 @@ export const SuggestedDish: React.FC<SuggestedDishProps> = ({ cafe }) => {
             </div>
             <h2 className="text-3xl font-serif italic text-white">Recommendations in motion</h2>
           </motion.div>
+
+          <AnimatePresence>
+            {loading && (
+              <motion.div 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="absolute inset-0 z-40 bg-black/40 backdrop-blur-sm flex items-center justify-center rounded-3xl"
+              >
+                <div className="flex flex-col items-center gap-3">
+                  <Sparkles className="w-8 h-8 animate-pulse" style={{ color: `rgb(${t.accentRgb})` }} />
+                  <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-white/60">Chef is thinking...</p>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           <div className="absolute top-8 right-8 flex gap-2">
             <button 
@@ -98,11 +117,17 @@ export const SuggestedDish: React.FC<SuggestedDishProps> = ({ cafe }) => {
             style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
           >
             {suggestedDishes.map(({dish, reason}, index) => (
-              <div key={dish.id} className="snap-center md:snap-start shrink-0 w-[280px] sm:w-[320px] md:w-[360px] relative pt-4 first:ml-0">
+              <div key={dish.id} className="snap-center shrink-0 w-[280px] relative pt-4 first:ml-0">
                 <div className="absolute top-1 left-6 z-30 text-black text-[10px] uppercase tracking-wider font-bold px-3 py-1 rounded-full shadow-lg" style={{ backgroundColor: `rgb(${t.primaryRgb})` }}>
                   {reason}
                 </div>
-                <DishCard dish={dish} cafeId={cafe.id} index={index} themeColor={cafe.themeColor} />
+                <DishCard 
+                  dish={dish} 
+                  cafeId={cafe.id} 
+                  cafeName={cafe.name} 
+                  index={index} 
+                  themeColor={cafe.themeColor} 
+                />
               </div>
             ))}
           </div>

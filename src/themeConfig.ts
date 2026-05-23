@@ -16,20 +16,10 @@ const themes: Record<string, ThemeColors> = {
     accentRgb: '251 191 36',    // amber-400
     lightRgb: '252 211 77',     // amber-300
   },
-  cyan: {
-    primaryRgb: '6 182 212',    // cyan-500
-    accentRgb: '34 211 238',    // cyan-400
-    lightRgb: '103 232 249',    // cyan-300
-  },
-  rose: {
-    primaryRgb: '244 63 94',    // rose-500
-    accentRgb: '251 113 133',   // rose-400
-    lightRgb: '253 164 175',    // rose-300
-  },
-  emerald: {
-    primaryRgb: '16 185 129',   // emerald-500
-    accentRgb: '52 211 153',    // emerald-400
-    lightRgb: '110 231 183',    // emerald-300
+  warm: {
+    primaryRgb: '210 130 80',   // terracotta-caramel — Croft House
+    accentRgb: '232 155 100',   // warm peach
+    lightRgb: '248 190 145',    // soft blush
   },
 };
 

@@ -1,119 +1,109 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { QrCode, Sparkles, ArrowRight } from 'lucide-react';
-import { QRScanner } from './QRScanner';
-import { OnboardingModal } from './OnboardingModal';
+import { Sparkles, Scan, Brain, Smartphone, ArrowRight, Phone } from 'lucide-react';
+import { AmbientBackground } from './AmbientBackground';
+import { useMotion } from '../context/MotionContext';
+
+const FEATURES = [
+  { Icon: Scan,       label: 'AR Dish Previews',      desc: 'See every dish in 3D before ordering' },
+  { Icon: Brain,      label: 'AI Recommendations',    desc: 'Personalized picks powered by taste profiles' },
+  { Icon: Smartphone, label: 'No App Required',        desc: 'Works instantly in any mobile browser' },
+] as const;
 
 export const LandingPage: React.FC = () => {
-  const [showScanner, setShowScanner] = useState(false);
-  const [showOnboarding, setShowOnboarding] = useState(false);
-
-  const handleScan = (decodedText: string) => {
-    try {
-      const url = new URL(decodedText);
-      // If it's a link to our own domain or a relative link with ?cafe=
-      if (url.searchParams.has('cafe')) {
-        window.location.href = decodedText;
-      } else {
-        alert("Invalid QR code for this platform.");
-        setShowScanner(false);
-      }
-    } catch (e) {
-      // If it's not a URL, check if it's just a cafe ID (legacy support or simplified codes)
-      alert("Please scan a valid table QR code.");
-      setShowScanner(false);
-    }
-  };
+  const { needsPermission, requestPermission } = useMotion();
 
   return (
     <div className="min-h-screen bg-[#020204] text-white flex flex-col items-center justify-center p-6 relative overflow-hidden">
-      {/* Background Effects */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-amber-500/10 rounded-full mix-blend-screen filter blur-[120px] animate-blob" />
-        <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-blue-500/10 rounded-full mix-blend-screen filter blur-[120px] animate-blob animation-delay-2000" />
-      </div>
+      <AmbientBackground themeColor="amber" />
 
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 1 }}
-        className="max-w-3xl w-full text-center space-y-12 relative z-10"
+        className="max-w-3xl w-full text-center space-y-10 relative z-10"
       >
+        {/* Badge */}
+        <motion.div
+          initial={{ scale: 0.8, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ delay: 0.2, duration: 0.8 }}
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 border border-white/10 text-amber-400 text-xs font-mono tracking-[0.3em] uppercase"
+        >
+          <Sparkles className="w-4 h-4" />
+          Next-Gen Dining
+        </motion.div>
+
+        {/* Headline */}
         <div className="space-y-4">
-          <motion.div
-            initial={{ scale: 0.8, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ delay: 0.2, duration: 0.8 }}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 border border-white/10 text-amber-400 text-xs font-mono tracking-[0.3em] uppercase mb-8"
-          >
-            <Sparkles className="w-4 h-4" />
-            Next-Gen Dining
-          </motion.div>
-          
-          <h1 className="text-6xl md:text-8xl font-serif italic text-white leading-tight tracking-tight">
+          <h1 className="text-5xl md:text-6xl font-serif italic text-white leading-tight tracking-tight">
             Augmen<span className="text-amber-500">Table</span>
           </h1>
-          <p className="text-white/60 text-xl md:text-2xl font-light max-w-xl mx-auto leading-relaxed">
-            The immersive AR ecosystem for modern restaurants and cafes.
+          <p className="text-white/70 text-lg font-light max-w-lg mx-auto leading-relaxed">
+            Transform your menu into an immersive 3D experience. Your guests see every dish, beautifully — before they order.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-2xl mx-auto text-left">
-          <motion.button 
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            onClick={() => setShowScanner(true)}
-            className="glass-liquid p-8 rounded-[2rem] space-y-4 cursor-pointer text-left w-full group relative overflow-hidden"
-          >
-            <div className="absolute inset-0 bg-amber-500/5 opacity-0 group-hover:opacity-100 transition-opacity" />
-            <div className="w-12 h-12 rounded-2xl bg-amber-500/20 flex items-center justify-center text-amber-500 relative z-10">
-              <QrCode className="w-6 h-6" />
-            </div>
-            <h3 className="text-xl font-medium relative z-10">Ready to scan?</h3>
-            <p className="text-white/40 text-sm leading-relaxed relative z-10">
-              Click here to open the camera and scan the QR code on your table.
-            </p>
-          </motion.button>
-          
-          <motion.button 
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            onClick={() => setShowOnboarding(true)}
-            className="glass-liquid p-8 rounded-[2rem] space-y-4 cursor-pointer text-left w-full group relative overflow-hidden border-amber-500/20"
-          >
-            <div className="absolute inset-0 bg-blue-500/5 opacity-0 group-hover:opacity-100 transition-opacity" />
-            <div className="w-12 h-12 rounded-2xl bg-blue-500/20 flex items-center justify-center text-blue-400 relative z-10">
-              <ArrowRight className="w-6 h-6" />
-            </div>
-            <h3 className="text-xl font-medium relative z-10">Onboard your Cafe</h3>
-            <p className="text-white/40 text-sm leading-relaxed relative z-10">
-              Join 100+ premium venues. Transform your menu into an immersive digital experience.
-            </p>
-          </motion.button>
+        {/* Feature pills */}
+        <div className="flex flex-wrap justify-center gap-2.5">
+          {FEATURES.map(({ Icon, label }, i) => (
+            <motion.div
+              key={label}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.4 + i * 0.1, duration: 0.6 }}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 border border-white/10 text-white/65 text-xs font-mono"
+            >
+              <Icon className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
+              {label}
+            </motion.div>
+          ))}
         </div>
 
-        <footer className="pt-12 border-t border-white/10 flex flex-col items-center gap-4">
-          <p className="text-white/40 text-xs font-mono uppercase tracking-[0.2em]">Contact for Partnership</p>
-          <div className="flex flex-col items-center gap-1">
-            <p className="text-white/80 font-medium">Preyansh Patni</p>
-            <p className="text-white/40 text-sm">preyanshpatni30@gmail.com</p>
-          </div>
-        </footer>
+        {/* CTAs */}
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.7, duration: 0.7 }}
+          className="flex flex-col sm:flex-row items-center justify-center gap-3"
+        >
+          <a
+            href="mailto:preyanshpatni30@gmail.com?subject=AugmenTable%20Demo%20Request"
+            className="group inline-flex items-center gap-2 px-8 py-3.5 rounded-2xl bg-amber-500 text-black font-semibold text-sm tracking-wide hover:bg-amber-400 active:scale-[0.98] transition-all duration-200 shadow-[0_0_32px_rgba(245,158,11,0.4)]"
+          >
+            Request a Demo
+            <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
+          </a>
+          <a
+            href="tel:6378997880"
+            className="inline-flex items-center gap-2 px-6 py-3.5 rounded-2xl bg-white/5 border border-white/15 text-white/75 text-sm font-mono tracking-wide hover:bg-white/10 hover:border-white/25 hover:text-white/90 transition-all duration-200"
+          >
+            <Phone className="w-4 h-4 text-amber-400" />
+            +91 63789 97880
+          </a>
+        </motion.div>
+
+        {/* iOS motion permission — unchanged */}
+        <AnimatePresence>
+          {needsPermission && (
+            <motion.button
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 10 }}
+              onClick={requestPermission}
+              className="px-6 py-2 rounded-xl bg-white/5 border border-white/20 text-white/80 text-xs font-mono tracking-widest uppercase hover:bg-white/10 transition-all"
+            >
+              Enable Glass Interactions
+            </motion.button>
+          )}
+        </AnimatePresence>
+
+        {/* Footer */}
+        <div className="pt-8 border-t border-white/10 flex flex-col items-center gap-1">
+          <p className="text-white/30 text-xs font-mono uppercase tracking-[0.2em]">Built by</p>
+          <p className="text-white/55 text-sm font-medium">Preyansh Patni</p>
+        </div>
       </motion.div>
-
-      <AnimatePresence>
-        {showScanner && (
-          <QRScanner 
-            onScan={handleScan} 
-            onClose={() => setShowScanner(false)} 
-          />
-        )}
-      </AnimatePresence>
-
-      <OnboardingModal 
-        isOpen={showOnboarding} 
-        onClose={() => setShowOnboarding(false)} 
-      />
     </div>
   );
 };

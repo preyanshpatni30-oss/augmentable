@@ -6,15 +6,17 @@ import { getThemeColors } from '../themeConfig';
 interface SpaceGalleryProps {
   images: { src: string; label: string }[];
   themeColor: string;
+  variant?: 'wide' | 'portrait';
 }
 
 /**
  * A sleek horizontal gallery section that shows the cafe's interiors.
  * Sits between Chef's Board and the Menu.
  */
-export const SpaceGallery: React.FC<SpaceGalleryProps> = ({ images, themeColor }) => {
+export const SpaceGallery: React.FC<SpaceGalleryProps> = ({ images, themeColor, variant = 'wide' }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const t = getThemeColors(themeColor);
+  const isPortrait = variant === 'portrait';
 
   const scroll = (dir: 'left' | 'right') => {
     if (!scrollRef.current) return;
@@ -40,7 +42,7 @@ export const SpaceGallery: React.FC<SpaceGalleryProps> = ({ images, themeColor }
               <MapPin className="w-4 h-4" style={{ color: `rgb(${t.accentRgb})` }} />
               The Space
             </div>
-            <h2 className="text-2xl md:text-3xl font-serif italic text-white">Feel the ambiance</h2>
+            <h2 className="text-2xl font-serif italic text-white">Feel the ambiance</h2>
           </div>
           <div className="flex gap-2">
             <button
@@ -71,14 +73,15 @@ export const SpaceGallery: React.FC<SpaceGalleryProps> = ({ images, themeColor }
               whileInView={{ opacity: 1, scale: 1 }}
               viewport={{ once: true }}
               transition={{ delay: i * 0.1, duration: 0.5 }}
-              className="snap-center shrink-0 w-[280px] sm:w-[340px] md:w-[400px] group relative overflow-hidden rounded-2xl cursor-pointer"
+              className={`${isPortrait ? 'w-[170px]' : 'w-[280px]'} snap-center shrink-0 group relative overflow-hidden rounded-2xl cursor-pointer bg-white/[0.03]`}
             >
-              <div className="aspect-[4/3] overflow-hidden">
+              <div className={`${isPortrait ? 'aspect-[3/5]' : 'aspect-[4/3]'} overflow-hidden`}>
                 <img
                   src={img.src}
                   alt={img.label}
-                  className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                  className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
                   loading="lazy"
+                  style={{ filter: isPortrait ? 'contrast(1.08) saturate(1.04)' : undefined }}
                 />
               </div>
               {/* Overlay on hover */}
