@@ -8,16 +8,14 @@ export const MODEL_ORIENTATIONS: Record<string, string> = {
   // Mayanagri reference — exported already lying flat, no correction needed
   'mg-asparagus-tempura': '0deg 0deg 0deg',
 
-  // Pitch -90 tilts dish face upward toward the camera (camera is at 65° above horizon)
-  'mg-avocado-roll': '0deg -90deg 0deg',
-  'mg-california': '0deg -90deg 0deg',
-  'mg-spicy-shiitake': '0deg -90deg 0deg',
-  'mg-crunchy-paneer-sushi': '0deg -90deg 0deg',
-  'mg-crunchy-paneer-bao': '0deg -90deg 0deg',
-
-  // Sushi — unmapped rolls, same form factor
-  'mg-enoki-mushroom-sushi': '0deg -90deg 0deg',
-  'mg-crispy-chives': '0deg -90deg 0deg',
+  // Sushi rolls — same export pipeline as bowls, natural orientation matches Buddha Bowl
+  'mg-avocado-roll': '0deg 0deg 0deg',
+  'mg-california': '0deg 0deg 0deg',
+  'mg-spicy-shiitake': '0deg 0deg 0deg',
+  'mg-crunchy-paneer-sushi': '0deg 0deg 0deg',
+  'mg-crunchy-paneer-bao': '0deg 0deg 0deg',
+  'mg-enoki-mushroom-sushi': '0deg 0deg 0deg',
+  'mg-crispy-chives': '0deg 0deg 0deg',
 
   // Healthy bowls — opening already faces +Y in export, no rotation needed
   'mg-buddha-bowl': '0deg 0deg 0deg',
@@ -33,7 +31,7 @@ export const MODEL_ORIENTATIONS: Record<string, string> = {
   'mg-risotto-green': '0deg 0deg 0deg',
   'mg-risotto-three-cheese': '0deg 0deg 0deg',
 
-  // Dim sum — food surface already faces +Y in export, no rotation needed
+  // Dim sum — same export pipeline as bowls, opening faces +Y, no rotation needed
   'mg-truffle-edamame-cheese': '0deg 0deg 0deg',
   'mg-beetroot-bamboo-shoot': '0deg 0deg 0deg',
   'mg-thai-asparagus': '0deg 0deg 0deg',
@@ -43,8 +41,7 @@ export const MODEL_ORIENTATIONS: Record<string, string> = {
   'mg-shiitake-button-mushroom': '0deg 0deg 0deg',
 
   // Bao — same export pipeline as dim sum, food already faces +Y
-  // mg-crunchy-asparagus intentionally omitted: R2 file has wrong content (sushi model)
-  'mg-crunchy-asparagus': '0deg 0deg 0deg',
+  'mg-crunchy-bao': '0deg 0deg 0deg',
   'mg-cottage-cheese-sun-dried-tomato': '0deg 0deg 0deg',
   'mg-tempura-crunchy-vegetable': '0deg 0deg 0deg',
 

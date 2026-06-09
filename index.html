@@ -4,10 +4,33 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <title>Augmentable</title>
+
+    <!-- SEO -->
+    <meta name="description" content="AugmenTable — see every dish in immersive 3D AR before you order. No app required." />
+    <meta name="robots" content="index, follow" />
+
+    <!-- Theme colour for browser chrome and Android PWA -->
+    <meta name="theme-color" content="#020204" />
+
+    <!-- Open Graph / social sharing -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="AugmenTable — Immersive AR Dining" />
+    <meta property="og:description" content="See every dish in 3D before you order. Scan the menu, place food on your table, enjoy the experience." />
+    <meta property="og:url" content="https://augmentable.vercel.app" />
+
+    <!-- Apple mobile web-app hints -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="AugmenTable" />
+
+    <!-- CDN preconnects — resolves DNS + TLS before first model fetch -->
+    <link rel="preconnect" href="https://pub-b76afc58058348e0bf5af4d8c1ede86a.r2.dev" crossorigin>
+    <link rel="dns-prefetch" href="https://pub-b76afc58058348e0bf5af4d8c1ede86a.r2.dev">
+
+    <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Playfair+Display:ital,wght@0,400;0,600;1,400&family=Space+Grotesk:wght@300;400;500;600&family=Sora:wght@300;400;500;600;700&family=Cormorant+Garamond:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
   </head>
   <body class="bg-black text-white antialiased selection:bg-amber-500/30">
     <div id="root"></div>

@@ -2,12 +2,43 @@ import React, { useState, useEffect, Suspense, lazy, useMemo } from 'react';
 import { useCafe } from './hooks/useCafe';
 import { Header } from './components/Header';
 import { MenuGrid } from './components/MenuGrid';
-import { SuggestedDish } from './components/SuggestedDish';
 import { AmbientHero } from './components/AmbientHero';
 import { SpaceGallery } from './components/SpaceGallery';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Sparkles } from 'lucide-react';
 import { AmbientBackground } from './components/AmbientBackground';
 import { getThemeStyle, getThemeColors } from './themeConfig';
+
+function ScrollProgress({ rgb }: { rgb: string }) {
+  const [pct, setPct] = useState(0);
+  useEffect(() => {
+    const root = document.getElementById('root');
+    if (!root) return;
+    const onScroll = () => {
+      const max = root.scrollHeight - root.clientHeight;
+      setPct(max > 0 ? (root.scrollTop / max) * 100 : 0);
+    };
+    root.addEventListener('scroll', onScroll, { passive: true });
+    return () => root.removeEventListener('scroll', onScroll);
+  }, []);
+  return (
+    <div className="fixed top-0 left-0 right-0 h-[2px] z-[10000] pointer-events-none">
+      <div
+        className="h-full"
+        style={{ width: `${pct}%`, background: `linear-gradient(90deg, rgb(${rgb}), rgba(${rgb},0.3))`, transition: 'width 80ms linear' }}
+      />
+    </div>
+  );
+}
+
+function SectionDivider({ rgb }: { rgb: string }) {
+  return (
+    <div className="section-divider">
+      <div className="section-divider-line" style={{ background: `linear-gradient(90deg, transparent, rgb(${rgb}))` }} />
+      <Sparkles className="w-3 h-3 shrink-0" style={{ color: `rgba(${rgb},0.4)` }} />
+      <div className="section-divider-line" style={{ background: `linear-gradient(90deg, rgb(${rgb}), transparent)` }} />
+    </div>
+  );
+}
 
 // Lazy load utility components
 const LandingPage = lazy(() => import('./components/LandingPage').then(m => ({ default: m.LandingPage })));
@@ -74,13 +105,17 @@ function App() {
           className="w-full min-h-screen max-w-[480px] mx-auto bg-[#020204] text-white overflow-x-hidden relative"
           style={{
             ...themeData.style,
-            // @ts-ignore - CSS custom property for selection color
             '--selection-color': `rgba(${themeData.colors.primaryRgb}, 0.3)`,
           } as React.CSSProperties}
         >
           <style>{`
             ::selection { background: rgba(${themeData.colors.primaryRgb}, 0.3); }
           `}</style>
+
+          {/* Cinematic overlays */}
+          <div className="grain-overlay" aria-hidden="true" />
+          <div className="vignette-overlay" aria-hidden="true" />
+          <ScrollProgress rgb={themeData.colors.primaryRgb} />
 
           <AmbientBackground themeColor={currentCafe.themeColor} />
 
@@ -97,22 +132,26 @@ function App() {
 
             <Header cafe={currentCafe} tableNumber={tableNumber} />
 
-            <main className="space-y-12">
-              <SuggestedDish cafe={currentCafe} />
-
+            <main className="space-y-8">
               {currentCafe.spaceGallery && currentCafe.spaceGallery.length > 0 && (
-                <SpaceGallery
-                  images={currentCafe.spaceGallery}
-                  themeColor={currentCafe.themeColor}
-                  variant={currentCafe.id === 'mayanagri' ? 'portrait' : 'wide'}
-                />
+                <>
+                  <SectionDivider rgb={themeData.colors.primaryRgb} />
+                  <SpaceGallery
+                    images={currentCafe.spaceGallery}
+                    themeColor={currentCafe.themeColor}
+                    variant={currentCafe.id === 'mayanagri' ? 'portrait' : 'wide'}
+                  />
+                </>
               )}
+
+              <SectionDivider rgb={themeData.colors.primaryRgb} />
 
               <MenuGrid
                 dishes={currentCafe.menu}
                 cafeId={currentCafe.id}
                 cafeName={currentCafe.name}
                 themeColor={currentCafe.themeColor}
+                vegetarianMenu={currentCafe.vegetarianMenu}
               />
             </main>
 
@@ -123,10 +162,8 @@ function App() {
                   href="https://augmentable.vercel.app"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="transition-colors"
-                  style={{ color: `rgba(${themeData.colors.primaryRgb}, 0.7)` }}
-                  onMouseEnter={(e) => e.currentTarget.style.color = `rgb(${themeData.colors.primaryRgb})`}
-                  onMouseLeave={(e) => e.currentTarget.style.color = `rgba(${themeData.colors.primaryRgb}, 0.7)`}
+                  className="opacity-70 hover:opacity-100 active:opacity-100 transition-opacity"
+                  style={{ color: `rgb(${themeData.colors.primaryRgb})` }}
                 >
                   augmentable.vercel.app
                 </a>
@@ -135,18 +172,14 @@ function App() {
                 <p>
                   <a
                     href="tel:6378997880"
-                    className="transition-colors"
-                    style={{ color: `rgba(${themeData.colors.primaryRgb}, 0.7)` }}
-                    onMouseEnter={(e) => e.currentTarget.style.color = `rgb(${themeData.colors.primaryRgb})`}
-                    onMouseLeave={(e) => e.currentTarget.style.color = `rgba(${themeData.colors.primaryRgb}, 0.7)`}
+                    className="opacity-70 hover:opacity-100 active:opacity-100 transition-opacity"
+                    style={{ color: `rgb(${themeData.colors.primaryRgb})` }}
                   >6378997880</a>
                   <span className="text-white/30 mx-2">•</span>
                   <a
                     href="mailto:preyanshpatni30@gmail.com"
-                    className="transition-colors"
-                    style={{ color: `rgba(${themeData.colors.primaryRgb}, 0.7)` }}
-                    onMouseEnter={(e) => e.currentTarget.style.color = `rgb(${themeData.colors.primaryRgb})`}
-                    onMouseLeave={(e) => e.currentTarget.style.color = `rgba(${themeData.colors.primaryRgb}, 0.7)`}
+                    className="opacity-70 hover:opacity-100 active:opacity-100 transition-opacity"
+                    style={{ color: `rgb(${themeData.colors.primaryRgb})` }}
                   >preyanshpatni30@gmail.com</a>
                 </p>
               </div>

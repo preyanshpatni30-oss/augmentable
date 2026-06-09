@@ -83,7 +83,7 @@ class ModelDownloadManager {
     this.progressValues.delete(url);
     if (typeof window !== 'undefined' && 'caches' in window) {
       try {
-        const cache = await caches.open('augmentable-model-cache-v2');
+        const cache = await caches.open('augmentable-model-cache-v4');
         await cache.delete(url);
       } catch {}
     }
@@ -119,7 +119,7 @@ class ModelDownloadManager {
   }
 
   private async startDownload(url: string): Promise<string> {
-    const cacheName = 'augmentable-model-cache-v2';
+    const cacheName = 'augmentable-model-cache-v4';
     
     // Check Cache Storage first
     if (typeof window !== 'undefined' && 'caches' in window) {
@@ -134,13 +134,17 @@ class ModelDownloadManager {
             const headResponse = await fetch(url, { method: 'HEAD', cache: 'no-cache' });
             if (headResponse.ok) {
               const serverETag = headResponse.headers.get('etag');
+              const serverLastMod = headResponse.headers.get('last-modified');
               const serverLength = headResponse.headers.get('content-length');
-              
+
               const cachedETag = cachedResponse.headers.get('etag');
+              const cachedLastMod = cachedResponse.headers.get('last-modified');
               const cachedLength = cachedResponse.headers.get('content-length');
-              
+
               if (serverETag && cachedETag) {
                 isCacheValid = (serverETag === cachedETag);
+              } else if (serverLastMod && cachedLastMod) {
+                isCacheValid = (serverLastMod === cachedLastMod);
               } else if (serverLength && cachedLength) {
                 isCacheValid = (parseInt(serverLength, 10) === parseInt(cachedLength, 10));
               }
@@ -241,7 +245,7 @@ export const modelDownloadManager = new ModelDownloadManager();
 if (typeof window !== 'undefined' && 'caches' in window) {
   caches.keys().then(names => {
     names.forEach(name => {
-      if (name.startsWith('augmentable-model-cache-') && name !== 'augmentable-model-cache-v2') {
+      if (name.startsWith('augmentable-model-cache-') && name !== 'augmentable-model-cache-v4') {
         caches.delete(name);
       }
     });

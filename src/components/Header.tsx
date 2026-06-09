@@ -4,16 +4,36 @@ import { Cafe } from '../data/types';
 import { Sparkles } from 'lucide-react';
 import { getThemeColors } from '../themeConfig';
 import { useMagnetic } from '../hooks/useMagnetic';
+import { getMostViewedDish, getARViews } from '../utils/arViewTracker';
 
 interface HeaderProps {
   cafe: Cafe;
   tableNumber?: string;
 }
 
+function useCountUp(target: number, duration = 1400): number {
+  const [count, setCount] = useState(0);
+  useEffect(() => {
+    let rafId: number;
+    let start: number | null = null;
+    const step = (ts: number) => {
+      if (!start) start = ts;
+      const p = Math.min((ts - start) / duration, 1);
+      setCount(Math.round(p * target));
+      if (p < 1) rafId = requestAnimationFrame(step);
+    };
+    rafId = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(rafId);
+  }, [target, duration]);
+  return count;
+}
+
 export const Header: React.FC<HeaderProps> = ({ cafe, tableNumber }) => {
   const [activeSection, setActiveSection] = useState<'menu' | 'chef'>('menu');
-  const featuredDish = cafe.menu[0];
+  const [spotlightDish, setSpotlightDish] = useState(() => getMostViewedDish(cafe.menu) ?? cafe.menu[0]);
   const t = getThemeColors(cafe.themeColor);
+  const arCount = cafe.menu.filter(d => d.arEnabled === true).length;
+  const animatedCount = useCountUp(arCount);
 
   useEffect(() => {
     const setFromHash = () => {
@@ -26,6 +46,15 @@ export const Header: React.FC<HeaderProps> = ({ cafe, tableNumber }) => {
     window.addEventListener('hashchange', setFromHash);
     return () => window.removeEventListener('hashchange', setFromHash);
   }, []);
+
+  useEffect(() => {
+    const onARView = () => {
+      const top = getMostViewedDish(cafe.menu);
+      if (top) setSpotlightDish(top);
+    };
+    window.addEventListener('ar-view-updated', onARView);
+    return () => window.removeEventListener('ar-view-updated', onARView);
+  }, [cafe.menu]);
 
   const handleNavigate = (section: 'menu' | 'chef') => {
     setActiveSection(section);
@@ -62,7 +91,8 @@ export const Header: React.FC<HeaderProps> = ({ cafe, tableNumber }) => {
           <div className="space-y-8">
             <div className="space-y-4">
               <h1 className="text-4xl font-serif italic text-white leading-[1.03] tracking-tight">
-                Immersive tasting for <span style={{ color: `rgba(${t.lightRgb}, 0.9)` }}>{cafe.name}</span>
+                Immersive tasting for{' '}
+                <span className="text-shimmer" style={{ color: `rgba(${t.lightRgb}, 0.9)` }}>{cafe.name}</span>
               </h1>
               <p className="text-white/70 text-base font-light max-w-2xl leading-relaxed">
                 {cafe.tagline} — contactless ordering with chef-led spotlights in one calm surface.
@@ -84,25 +114,6 @@ export const Header: React.FC<HeaderProps> = ({ cafe, tableNumber }) => {
               >
                 Explore Menu
               </button>
-              <button
-                ref={chefButton.ref}
-                type="button"
-                onClick={() => handleNavigate('chef')}
-                style={{
-                  ...chefButton.transformStyle,
-                  ...(activeSection === 'chef' ? {
-                    backgroundColor: `rgb(${t.accentRgb})`,
-                    boxShadow: `0 20px 60px rgba(${t.primaryRgb}, 0.3)`
-                  } : {})
-                }}
-                className={`inline-flex items-center gap-3 px-8 py-4 rounded-2xl font-semibold tracking-wide transition-all duration-500 hover:-translate-y-1 ${
-                  activeSection === 'chef'
-                    ? 'text-black'
-                    : 'glass-liquid text-white hover:bg-white/10'
-                }`}
-              >
-                Chef's Board
-              </button>
             </div>
           </div>
 
@@ -112,48 +123,55 @@ export const Header: React.FC<HeaderProps> = ({ cafe, tableNumber }) => {
               style={{ backgroundColor: `rgba(${t.primaryRgb}, 0.1)` }}
             />
             <div className="relative overflow-hidden rounded-[2.5rem] glass-liquid p-1">
-              <div className="rounded-[2.2rem] bg-black/40 backdrop-blur-3xl p-8 space-y-8">
+              <div className="rounded-[2.2rem] bg-black/40 backdrop-blur-3xl p-5 space-y-6">
                 <div className="flex items-center justify-between text-xs uppercase tracking-[0.4em] text-white/40">
                   <span>Chef Spotlight</span>
                   <Sparkles className="w-5 h-5 animate-pulse" style={{ color: `rgb(${t.accentRgb})` }} />
                 </div>
 
                 <div className="space-y-4">
-                  <div
-                    className="inline-block px-3 py-1 rounded-full text-[10px] font-mono tracking-widest uppercase"
-                    style={{
-                      backgroundColor: `rgba(${t.primaryRgb}, 0.1)`,
-                      borderWidth: '1px',
-                      borderColor: `rgba(${t.primaryRgb}, 0.2)`,
-                      color: `rgb(${t.accentRgb})`
-                    }}
-                  >
-                    Now Plating
+                  <div className="flex items-center gap-2">
+                    <div
+                      className="inline-block px-3 py-1 rounded-full text-[10px] font-mono tracking-widest uppercase"
+                      style={{
+                        backgroundColor: `rgba(${t.primaryRgb}, 0.1)`,
+                        borderWidth: '1px',
+                        borderColor: `rgba(${t.primaryRgb}, 0.2)`,
+                        color: `rgb(${t.accentRgb})`
+                      }}
+                    >
+                      {getARViews()[spotlightDish?.id ?? ''] ? 'Most Viewed in AR' : 'Now Plating'}
+                    </div>
+                    {getARViews()[spotlightDish?.id ?? ''] > 0 && (
+                      <span className="text-[10px] font-mono text-white/30">
+                        {getARViews()[spotlightDish.id]}× viewed
+                      </span>
+                    )}
                   </div>
-                  <h3 className="text-4xl font-serif text-white italic">{featuredDish?.name || 'Seasonal Special'}</h3>
+                  <h3 className="text-4xl font-serif text-white italic">{spotlightDish?.name || 'Seasonal Special'}</h3>
                   <p className="text-white/50 text-base leading-relaxed font-light">
-                    {featuredDish?.description || 'A masterpiece crafted for tonight.'}
+                    {spotlightDish?.description || 'A masterpiece crafted for tonight.'}
                   </p>
                 </div>
 
                 <div className="pt-6 border-t border-white/5 flex items-center justify-between">
                    <div className="flex items-center gap-4">
-                     <div className="h-14 w-14 rounded-2xl glass-liquid flex items-center justify-center text-2xl font-serif text-white">
-                       {cafe.menu.filter(d => d.arEnabled === true).length}
+                     <div className="h-14 w-14 rounded-2xl glass-liquid flex items-center justify-center text-2xl font-serif text-white tabular-nums">
+                       {animatedCount}
                      </div>
                      <div>
                        <p className="text-[10px] text-white/40 uppercase tracking-widest">AR Ready</p>
                        <p className="text-white/80 font-medium">Curated Items</p>
                      </div>
                    </div>
-                   {featuredDish && (
+                   {spotlightDish && (
                      <div className="text-right">
                        <p className="text-[10px] text-white/40 uppercase tracking-widest">Price</p>
                        <p
                          className="text-2xl font-mono font-bold text-glow-amber"
                          style={{ color: `rgb(${t.accentRgb})` }}
                        >
-                         ₹{featuredDish.price.toFixed(2)}
+                         ₹{spotlightDish.price.toFixed(2)}
                        </p>
                      </div>
                    )}

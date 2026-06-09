@@ -3,8 +3,9 @@ import { Cafe } from '../types';
 export const data: Cafe = {
   id: 'mayanagri',
   name: 'Mayanagri',
-  tagline: 'A Culinary Journey Through Time',
+  tagline: 'Mayanagri Through Time',
   themeColor: 'amber',
+  vegetarianMenu: true,
   ambientImages: [
     '/images/mayanagri/grand-hall.jpg',
     '/images/mayanagri/elegant-entrance.jpg',
@@ -13,9 +14,9 @@ export const data: Cafe = {
     '/images/mayanagri/ambient-lighting.jpg'
   ],
   spaceGallery: [
-    { src: '/images/mayanagri/grand-hall.jpg', label: 'The Grand Hall' },
-    { src: '/images/mayanagri/private-dining.jpg', label: 'Imperial Suite' },
-    { src: '/images/mayanagri/bar-lounge.jpg', label: 'The Celestial Bar' }
+    { src: '/images/mayanagri/grand-hall.jpg', label: 'Entrance' },
+    { src: '/images/mayanagri/private-dining.jpg', label: 'Dining Area' },
+    { src: '/images/mayanagri/bar-lounge.jpg', label: 'Main Hall' }
   ],
   menu: [
     {
@@ -268,7 +269,8 @@ export const data: Cafe = {
       "id": "mg-spicy-guava",
       "name": "Spicy Guava",
       "price": 175,
-      "category": "MOCKTAIL"
+      "category": "MOCKTAIL",
+      "isSpicy": true
     },
     {
       "id": "mg-blue-lagoon",
@@ -387,7 +389,8 @@ export const data: Cafe = {
       "id": "mg-mumbai-masala-sandwich",
       "name": "Mumbai Masala Sandwich",
       "price": 275,
-      "category": "SANDWICH & BURGER(9 AM TO 7 PM)"
+      "category": "SANDWICH & BURGER(9 AM TO 7 PM)",
+      "isSpicy": true
     },
     {
       "id": "mg-club-sandwich",
@@ -447,7 +450,8 @@ export const data: Cafe = {
       "id": "mg-ragda-patties",
       "name": "Ragda Patties",
       "price": 175,
-      "category": "CHAI KE SATH"
+      "category": "CHAI KE SATH",
+      "isSpicy": true
     },
     {
       "id": "mg-quinoa-upma",
@@ -1254,29 +1258,8 @@ export const data: Cafe = {
       "arEnabled": true
     },
     {
-      "id": "mg-crispy-chives",
-      "name": "Crispy Chives",
-      "price": 575,
-      "category": "SUSHI(12 PM TO 11 PM)",
-      "arEnabled": true
-    },
-    {
       "id": "mg-truffle-edamame-cheese",
       "name": "Truffle Edamame & Cheese",
-      "price": 425,
-      "category": "DIM SUM(12 PM TO 11 PM)",
-      "arEnabled": true
-    },
-    {
-      "id": "mg-beetroot-bamboo-shoot",
-      "name": "Beetroot & Bamboo Shoot",
-      "price": 425,
-      "category": "DIM SUM(12 PM TO 11 PM)",
-      "arEnabled": true
-    },
-    {
-      "id": "mg-thai-asparagus",
-      "name": "Thai Asparagus",
       "price": 425,
       "category": "DIM SUM(12 PM TO 11 PM)",
       "arEnabled": true
@@ -1332,10 +1315,13 @@ export const data: Cafe = {
 
     },
     {
-      "id": "mg-crunchy-asparagus",
+      "id": "mg-crunchy-bao",
       "name": "Crunchy Asparagus",
       "price": 425,
-      "category": "BAO(12 PM TO 11 PM)"
+      "category": "BAO(12 PM TO 11 PM)",
+      "arEnabled": true,
+      "modelUrl": "https://pub-b76afc58058348e0bf5af4d8c1ede86a.r2.dev/models/mayanagri/mg-crunchy-bao.glb?v=2",
+      "usdzUrl": "https://pub-b76afc58058348e0bf5af4d8c1ede86a.r2.dev/models/mayanagri/mg-crunchy-bao.usdz"
     },
     {
       "id": "mg-crunchy-paneer-bao",
@@ -1434,13 +1420,15 @@ export const data: Cafe = {
       "id": "mg-paneer-tikka-masala",
       "name": "Paneer Tikka Masala",
       "price": 525,
-      "category": "CURRY(12 PM TO 11 PM)"
+      "category": "CURRY(12 PM TO 11 PM)",
+      "isSpicy": true
     },
     {
       "id": "mg-kadai-paneer",
       "name": "Kadai Paneer",
       "price": 525,
-      "category": "CURRY(12 PM TO 11 PM)"
+      "category": "CURRY(12 PM TO 11 PM)",
+      "isSpicy": true
     },
     {
       "id": "mg-paneer-lababdar",
@@ -1464,7 +1452,8 @@ export const data: Cafe = {
       "id": "mg-dhaba-style-paneer-masala",
       "name": "Dhaba Style Paneer Masala",
       "price": 525,
-      "category": "CURRY(12 PM TO 11 PM)"
+      "category": "CURRY(12 PM TO 11 PM)",
+      "isSpicy": true
     },
     {
       "id": "mg-palak-paneer",
@@ -1542,13 +1531,15 @@ export const data: Cafe = {
       "id": "mg-jalfrezi",
       "name": "Jalfrezi",
       "price": 475,
-      "category": "CURRY(12 PM TO 11 PM)"
+      "category": "CURRY(12 PM TO 11 PM)",
+      "isSpicy": true
     },
     {
       "id": "mg-chana-masala",
       "name": "Chana Masala",
       "price": 475,
-      "category": "CURRY(12 PM TO 11 PM)"
+      "category": "CURRY(12 PM TO 11 PM)",
+      "isSpicy": true
     },
     {
       "id": "mg-rajma-masala",

@@ -56,22 +56,22 @@ export const AmbientHero: React.FC<AmbientHeroProps> = ({ images, interval = 700
         >
           {isPortrait ? (
             <>
+              {/* Blurred fill behind the sharp image so a portrait photo never shows hard bars */}
               <img
                 src={images[current]}
                 alt=""
-                className="absolute inset-0 h-full w-full object-cover scale-110 blur-2xl opacity-45"
+                className="absolute inset-0 h-full w-full object-cover scale-110 blur-2xl opacity-60"
                 loading="lazy"
-                style={{ filter: 'brightness(0.55) saturate(1.1)' }}
+                style={{ filter: 'brightness(0.7) saturate(1.1)' }}
               />
-              <div className="absolute inset-0 flex items-start justify-end pt-36 pr-4">
-                <img
-                  src={images[current]}
-                  alt=""
-                  className="h-auto max-h-[720px] w-auto max-w-[280px] rounded-[24px] object-contain shadow-[0_30px_90px_rgba(0,0,0,0.55)] ring-1 ring-white/18"
-                  loading="eager"
-                  style={{ filter: 'brightness(1.02) contrast(1.08) saturate(1.06)' }}
-                />
-              </div>
+              {/* Full, sharp portrait shown clearly as the hero backdrop (contained, centered) */}
+              <img
+                src={images[current]}
+                alt=""
+                className="absolute inset-0 h-full w-full object-cover object-center"
+                loading="eager"
+                style={{ filter: 'brightness(0.92) contrast(1.06) saturate(1.06)' }}
+              />
             </>
           ) : (
             <img
@@ -86,10 +86,13 @@ export const AmbientHero: React.FC<AmbientHeroProps> = ({ images, interval = 700
       </AnimatePresence>
 
       {/* Lighter overlay to keep text readable but make image clear */}
-      <div className={`absolute inset-0 bg-gradient-to-b ${isPortrait ? 'from-black/24 via-black/5 to-[#020204]' : 'from-black/30 via-black/10 to-[#020204]'}`} />
-      <div className={`absolute inset-0 bg-gradient-to-r ${isPortrait ? 'from-black/78 via-black/24 to-black/5' : 'from-black/40 via-transparent to-black/40'}`} />
-      {/* Noise grain on top */}
-      <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-[0.035] mix-blend-overlay" />
+      <div className={`absolute inset-0 bg-gradient-to-b ${isPortrait ? 'from-black/55 via-black/15 to-[#020204]' : 'from-black/30 via-black/10 to-[#020204]'}`} />
+      <div className={`absolute inset-0 bg-gradient-to-r ${isPortrait ? 'from-black/45 via-black/10 to-transparent' : 'from-black/40 via-transparent to-black/40'}`} />
+      {/* Noise grain on top — inline SVG avoids third-party dependency */}
+      <div
+        className="absolute inset-0 opacity-[0.035] mix-blend-overlay"
+        style={{ backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='256' height='256'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='256' height='256' filter='url(%23n)'/%3E%3C/svg%3E\")", backgroundSize: '256px 256px' }}
+      />
     </div>
   );
 };

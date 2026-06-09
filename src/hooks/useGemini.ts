@@ -1,7 +1,6 @@
 import { useState, useCallback } from 'react';
-import { GoogleGenerativeAI } from '@google/generative-ai';
 
-// SECURITY WARNING: In a production application, your API key should NEVER be exposed 
+// SECURITY WARNING: In a production application, your API key should NEVER be exposed
 // in the client-side code. This can lead to unauthorized billing and usage.
 //
 // RECOMMENDED PATTERN:
@@ -10,18 +9,31 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 // 3. The client calls your server, which then calls Gemini and returns the result.
 //
 const API_KEY = import.meta.env.VITE_GEMINI_API_KEY || '';
-const genAI = new GoogleGenerativeAI(API_KEY);
+
+// Lazy singleton — dynamically imports the SDK only when a key is present,
+// keeping ~180 KB out of the initial bundle for users without a key.
+let _genAIPromise: Promise<any> | null = null;
+async function getGenAI(): Promise<any | null> {
+  if (!API_KEY) return null;
+  if (!_genAIPromise) {
+    _genAIPromise = import('@google/generative-ai').then(({ GoogleGenerativeAI }) => {
+      return new GoogleGenerativeAI(API_KEY);
+    });
+  }
+  return _genAIPromise;
+}
 
 export const useGemini = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const generateRecommendations = useCallback(async (cafeName: string, tagline: string, menu: any[]) => {
-    if (!API_KEY) return null;
+    const genAI = await getGenAI();
+    if (!genAI) return null;
 
     setLoading(true);
     try {
-      const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+      const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
       const prompt = `
         You are the Head Chef at "${cafeName}" (${tagline}). 
         Menu: ${JSON.stringify(menu.map(d => ({ name: d.name, description: d.description || '' })))}
@@ -41,11 +53,12 @@ export const useGemini = () => {
   }, []);
 
   const generateFlavorProfile = useCallback(async (dishName: string, dishDescription: string = '') => {
-    if (!API_KEY) return null;
+    const genAI = await getGenAI();
+    if (!genAI) return null;
 
     setLoading(true);
     try {
-      const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+      const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
       const prompt = `
         Analyze this dish: "${dishName}" - "${dishDescription}".
         Provide 3 primary flavor notes and a percentage for each (total 100%).
@@ -66,15 +79,16 @@ export const useGemini = () => {
 
   const askTheChef = useCallback(async (dishName: string, dishDescription: string = '', cafeName: string, question: string) => {
     setLoading(true);
-    
-    if (!API_KEY) {
+
+    const genAI = await getGenAI();
+    if (!genAI) {
       await new Promise(resolve => setTimeout(resolve, 800));
       setLoading(false);
       return "The kitchen is currently in a frenzy! (API Key missing). I can tell you this dish is made with love.";
     }
 
     try {
-      const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+      const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
       const prompt = `
         You are the Executive Chef at "${cafeName}". You are passionate and deeply knowledgeable.
         Dish: "${dishName}"

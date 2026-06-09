@@ -47,15 +47,17 @@ export const SpaceGallery: React.FC<SpaceGalleryProps> = ({ images, themeColor, 
           <div className="flex gap-2">
             <button
               onClick={() => scroll('left')}
+              aria-label="Scroll gallery left"
               className="p-2 rounded-full glass-liquid glass-liquid-hover text-white/60 hover:text-white"
             >
-              <ChevronLeft className="w-5 h-5" />
+              <ChevronLeft className="w-5 h-5" aria-hidden="true" />
             </button>
             <button
               onClick={() => scroll('right')}
+              aria-label="Scroll gallery right"
               className="p-2 rounded-full glass-liquid glass-liquid-hover text-white/60 hover:text-white"
             >
-              <ChevronRight className="w-5 h-5" />
+              <ChevronRight className="w-5 h-5" aria-hidden="true" />
             </button>
           </div>
         </div>
@@ -63,7 +65,7 @@ export const SpaceGallery: React.FC<SpaceGalleryProps> = ({ images, themeColor, 
         {/* Photo Strip */}
         <div
           ref={scrollRef}
-          className="flex gap-4 overflow-x-auto snap-x snap-mandatory pb-2"
+          className="flex gap-4 overflow-x-auto snap-x snap-mandatory pb-2 scrollbar-hide"
           style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
         >
           {images.map((img, i) => (
@@ -84,10 +86,10 @@ export const SpaceGallery: React.FC<SpaceGalleryProps> = ({ images, themeColor, 
                   style={{ filter: isPortrait ? 'contrast(1.08) saturate(1.04)' : undefined }}
                 />
               </div>
-              {/* Overlay on hover */}
-              <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 flex items-end p-5">
+              {/* Label — always visible so mobile users can read it */}
+              <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/10 to-transparent flex items-end p-3 group-hover:from-black/75 transition-all duration-500">
                 <span
-                  className="text-sm font-mono uppercase tracking-widest"
+                  className="text-xs font-mono uppercase tracking-widest"
                   style={{ color: `rgb(${t.lightRgb})` }}
                 >
                   {img.label}

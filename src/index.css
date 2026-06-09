@@ -2,11 +2,14 @@
 
 /* Mobile-only optimization */
 html, body {
-  width: 100vw;
-  height: 100vh;
+  width: 100%;
   max-width: 100vw;
   overflow-x: hidden;
   overscroll-behavior: none;
+}
+
+html {
+  height: 100%;
 }
 
 body {
@@ -32,6 +35,15 @@ body {
   overflow-y: auto;
   overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
+  /* Respect iPhone notch and home indicator */
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* Allow text input on mobile despite body user-select: none */
+input, textarea, [contenteditable] {
+  -webkit-user-select: text;
+  user-select: text;
 }
 
 /* Theme CSS custom properties — defaults to amber */
@@ -158,4 +170,80 @@ model-viewer {
 }
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
+}
+
+/* ── Cinematic grain overlay ── */
+@keyframes grain {
+  0%   { transform: translate(0,0); }
+  10%  { transform: translate(-5%,-5%); }
+  20%  { transform: translate(-10%,5%); }
+  30%  { transform: translate(5%,-10%); }
+  40%  { transform: translate(-5%,15%); }
+  50%  { transform: translate(-10%,5%); }
+  60%  { transform: translate(15%,0); }
+  70%  { transform: translate(0,10%); }
+  80%  { transform: translate(-15%,0); }
+  90%  { transform: translate(10%,5%); }
+  100% { transform: translate(0,0); }
+}
+
+.grain-overlay {
+  position: fixed;
+  inset: -50%;
+  width: 200%;
+  height: 200%;
+  z-index: 9999;
+  pointer-events: none;
+  opacity: 0.032;
+  background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='256' height='256'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/></filter><rect width='256' height='256' filter='url(%23n)'/></svg>");
+  background-size: 256px 256px;
+  animation: grain 0.6s steps(10) infinite;
+}
+
+/* ── Vignette ── */
+.vignette-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9998;
+  pointer-events: none;
+  background: radial-gradient(ellipse 85% 85% at 50% 40%, transparent 45%, rgba(0,0,0,0.65) 100%);
+}
+
+/* ── Shimmer on venue name ── */
+@keyframes shimmer-sweep {
+  0%   { background-position: -300% center; }
+  100% { background-position: 300% center; }
+}
+
+.text-shimmer {
+  background: linear-gradient(
+    90deg,
+    currentColor 20%,
+    rgba(255, 255, 255, 0.85) 48%,
+    currentColor 80%
+  );
+  background-size: 300% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: shimmer-sweep 5s linear infinite;
+}
+
+/* ── Section divider ── */
+.section-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 24px;
+  max-width: 480px;
+  margin: 0 auto;
+}
+.section-divider-line {
+  flex: 1;
+  height: 1px;
+  opacity: 0.18;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .grain-overlay, .text-shimmer { animation: none; }
 }

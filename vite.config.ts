@@ -21,6 +21,9 @@ export default defineConfig(() => {
           manualChunks: {
             'model-viewer': ['@google/model-viewer'],
             vendor: ['react', 'react-dom', 'motion'],
+            // @google/generative-ai is already lazily imported in useGemini.ts,
+            // so Vite auto-splits it — this entry just gives it a stable filename.
+            genai: ['@google/generative-ai'],
           },
         },
       },
