@@ -52,31 +52,6 @@ export const useGemini = () => {
     }
   }, []);
 
-  const generateFlavorProfile = useCallback(async (dishName: string, dishDescription: string = '') => {
-    const genAI = await getGenAI();
-    if (!genAI) return null;
-
-    setLoading(true);
-    try {
-      const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
-      const prompt = `
-        Analyze this dish: "${dishName}" - "${dishDescription}".
-        Provide 3 primary flavor notes and a percentage for each (total 100%).
-        Also provide a one-sentence tasting note.
-        Return ONLY a JSON object: {"notes": [{"label": "string", "percentage": number}], "tastingNote": "string"}
-      `;
-      const result = await model.generateContent(prompt);
-      const text = (await result.response).text();
-      const jsonMatch = text.match(/\{.*\}/s);
-      return jsonMatch ? JSON.parse(jsonMatch[0]) : null;
-    } catch (err) {
-      console.error("Gemini Flavor Error:", err);
-      return null;
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
   const askTheChef = useCallback(async (dishName: string, dishDescription: string = '', cafeName: string, question: string) => {
     setLoading(true);
 
@@ -114,5 +89,5 @@ export const useGemini = () => {
     }
   }, []);
 
-  return { generateRecommendations, generateFlavorProfile, askTheChef, loading, error, isConfigured: !!API_KEY };
+  return { generateRecommendations, askTheChef, loading, error, isConfigured: !!API_KEY };
 };

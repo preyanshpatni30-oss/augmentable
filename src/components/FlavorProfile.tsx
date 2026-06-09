@@ -1,7 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Sparkles, X, Loader2 } from 'lucide-react';
-import { useGemini } from '../hooks/useGemini';
+import { Sparkles, X } from 'lucide-react';
 import { flavorProfiles } from '../data/flavorProfiles';
 
 interface FlavorNote {
@@ -24,12 +23,6 @@ function readCache(dishId: string): FlavorData | null {
   }
 }
 
-function writeCache(dishId: string, data: FlavorData): void {
-  try {
-    localStorage.setItem(CACHE_PREFIX + dishId, JSON.stringify(data));
-  } catch {}
-}
-
 interface FlavorProfileProps {
   dishId: string;
   dishName: string;
@@ -40,62 +33,12 @@ interface FlavorProfileProps {
   onClose: () => void;
 }
 
-/**
- * AI-generated "Flavor Profile" panel shown on every dish card. Pulls 3 weighted
- * taste notes + a one-line tasting note from Gemini (via useGemini), renders them
- * as animated bars, and caches the result per-dish in localStorage so each dish is
- * only ever analyzed once. The fetch is lazy — it runs when the panel first opens.
- */
 export const FlavorProfile = React.memo<FlavorProfileProps>(({
   dishId, dishName, dishDescription, themeRgb, accentRgb, lightRgb, onClose,
 }) => {
-  const { generateFlavorProfile, isConfigured } = useGemini();
-  // Baked profiles (pre-generated for every dish) win first → instant, no API/quota.
-  // Fall back to a previously cached live result, then to a fresh Gemini call.
-  const [data, setData] = useState<FlavorData | null>(() => flavorProfiles[dishId] ?? readCache(dishId));
-  const [loading, setLoading] = useState(false);
-  const [failed, setFailed] = useState(false);
-  const fetchedRef = useRef(false);
-
-  useEffect(() => {
-    if (data || fetchedRef.current) return;
-    fetchedRef.current = true;
-    if (!isConfigured) {
-      setFailed(true);
-      return;
-    }
-
-    let cancelled = false;
-    (async () => {
-      setLoading(true);
-      try {
-        const result = await generateFlavorProfile(dishName, dishDescription || '');
-        if (cancelled) return;
-        if (result && Array.isArray(result.notes) && result.notes.length) {
-          const notes: FlavorNote[] = result.notes.slice(0, 3).map((n: any) => ({
-            label: String(n.label ?? '').slice(0, 20),
-            percentage: Math.max(0, Math.min(100, Math.round(Number(n.percentage) || 0))),
-          }));
-          const clean: FlavorData = {
-            notes,
-            tastingNote: String(result.tastingNote ?? ''),
-          };
-          setData(clean);
-          writeCache(dishId, clean);
-        } else {
-          setFailed(true);
-        }
-      } catch {
-        if (!cancelled) setFailed(true);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [data, isConfigured, generateFlavorProfile, dishName, dishDescription, dishId]);
+  // Baked profiles cover every dish — instant, no API calls needed.
+  // localStorage cache kept as a forward-compat fallback for any future uncovered ID.
+  const [data] = useState<FlavorData | null>(() => flavorProfiles[dishId] ?? readCache(dishId));
 
   return (
     <motion.div
@@ -121,18 +64,7 @@ export const FlavorProfile = React.memo<FlavorProfileProps>(({
 
       <div className="flex-1 overflow-y-auto scrollbar-hide flex flex-col justify-center">
         <AnimatePresence mode="wait">
-          {loading && (
-            <motion.div
-              key="loading"
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              className="flex flex-col items-center justify-center py-10 gap-4"
-            >
-              <Loader2 className="w-7 h-7 animate-spin" style={{ color: `rgb(${accentRgb})` }} />
-              <p className="text-white/40 text-xs italic font-serif">Reading the flavor notes…</p>
-            </motion.div>
-          )}
-
-          {!loading && data && (
+          {data ? (
             <motion.div
               key="data"
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
@@ -178,11 +110,9 @@ export const FlavorProfile = React.memo<FlavorProfileProps>(({
                 </motion.div>
               )}
             </motion.div>
-          )}
-
-          {!loading && !data && failed && (
+          ) : (
             <motion.div
-              key="failed"
+              key="fallback"
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               className="text-center py-6 space-y-3"
             >
@@ -193,9 +123,7 @@ export const FlavorProfile = React.memo<FlavorProfileProps>(({
               ) : (
                 <p className="text-white/50 text-sm italic font-serif">A taste best discovered in person.</p>
               )}
-              <p className="text-white/25 text-[10px] font-mono uppercase tracking-widest">
-                {isConfigured ? 'Flavor analysis unavailable' : 'AI flavor profile offline'}
-              </p>
+              <p className="text-white/25 text-[10px] font-mono uppercase tracking-widest">AI flavor profile offline</p>
             </motion.div>
           )}
         </AnimatePresence>
