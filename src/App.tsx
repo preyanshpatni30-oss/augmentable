@@ -78,7 +78,7 @@ function App() {
     try {
       const crashSaved = localStorage.getItem('at-cafe-crash');
       const crashTime = localStorage.getItem('at-cafe-crash-time');
-      if (crashSaved && crashTime && Date.now() - Number(crashTime) < 30_000) {
+      if (crashSaved && crashTime && Date.now() - Number(crashTime) < 300_000) {
         return { cafeId: crashSaved, tableParam: localStorage.getItem('at-table-crash') ?? '' };
       }
     } catch {}

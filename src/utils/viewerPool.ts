@@ -26,7 +26,7 @@ function computeMax(): number {
   // better, but low-memory iPhones still need a tighter cap.
   const isAndroid = /Android/i.test(ua);
   if (isAndroid) return 1;
-  if (isMobile) return typeof mem === 'number' && mem <= 3 ? 2 : 3;
+  if (isMobile) return 2; // iOS: 2 across the board — GPU strength can't be inferred from RAM alone
   if (typeof mem === 'number' && mem <= 4) return 6;
   return 12;
 }
