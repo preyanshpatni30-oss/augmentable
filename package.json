@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite --port=3000 --host=0.0.0.0",
+    "prebuild": "node scripts/verifyArModels.mjs",
     "build": "vite build",
+    "verify:models": "node scripts/verifyArModels.mjs",
     "preview": "vite preview --host=0.0.0.0",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit"

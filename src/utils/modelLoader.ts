@@ -118,51 +118,59 @@ class ModelDownloadManager {
     }
   }
 
+  // Stale-while-revalidate: check cache freshness in background so cached models
+  // serve instantly without blocking on a HEAD round-trip.
+  private async revalidateInBackground(url: string, cachedResponse: Response, cache: Cache): Promise<void> {
+    try {
+      const head = await fetch(url, { method: 'HEAD', cache: 'no-cache' });
+      if (!head.ok) return;
+
+      const isStale = (() => {
+        const sETag = head.headers.get('etag');
+        const cETag = cachedResponse.headers.get('etag');
+        if (sETag && cETag) return sETag !== cETag;
+
+        const sMod = head.headers.get('last-modified');
+        const cMod = cachedResponse.headers.get('last-modified');
+        if (sMod && cMod) return sMod !== cMod;
+
+        const sLen = head.headers.get('content-length');
+        const cLen = cachedResponse.headers.get('content-length');
+        if (sLen && cLen) return parseInt(sLen, 10) !== parseInt(cLen, 10);
+
+        return false;
+      })();
+
+      if (isStale) {
+        // Evict so the next load fetches a fresh copy
+        await cache.delete(url);
+        const objectUrl = this.objectUrls.get(url);
+        if (objectUrl) {
+          try { URL.revokeObjectURL(objectUrl); } catch {}
+          this.objectUrls.delete(url);
+        }
+      }
+    } catch {
+      // Background revalidation is best-effort; ignore all failures
+    }
+  }
+
   private async startDownload(url: string): Promise<string> {
     const cacheName = 'augmentable-model-cache-v4';
-    
-    // Check Cache Storage first
+
+    // Check Cache Storage first — serve immediately, revalidate in background
     if (typeof window !== 'undefined' && 'caches' in window) {
       try {
         const cache = await caches.open(cacheName);
         const cachedResponse = await cache.match(url);
         if (cachedResponse) {
-          let isCacheValid = true;
-          try {
-            // Perform a fast HEAD request to check if the server has a newer version.
-            // Disable browser caching for the HEAD request to guarantee we check the origin server.
-            const headResponse = await fetch(url, { method: 'HEAD', cache: 'no-cache' });
-            if (headResponse.ok) {
-              const serverETag = headResponse.headers.get('etag');
-              const serverLastMod = headResponse.headers.get('last-modified');
-              const serverLength = headResponse.headers.get('content-length');
-
-              const cachedETag = cachedResponse.headers.get('etag');
-              const cachedLastMod = cachedResponse.headers.get('last-modified');
-              const cachedLength = cachedResponse.headers.get('content-length');
-
-              if (serverETag && cachedETag) {
-                isCacheValid = (serverETag === cachedETag);
-              } else if (serverLastMod && cachedLastMod) {
-                isCacheValid = (serverLastMod === cachedLastMod);
-              } else if (serverLength && cachedLength) {
-                isCacheValid = (parseInt(serverLength, 10) === parseInt(cachedLength, 10));
-              }
-            }
-          } catch (headError) {
-            console.warn('Failed to perform HEAD validation, assuming cache is valid:', headError);
-            isCacheValid = true;
-          }
-
-          if (isCacheValid) {
-            const blob = await cachedResponse.blob();
-            const objectUrl = URL.createObjectURL(blob);
-            this.objectUrls.set(url, objectUrl);
-            this.updateProgress(url, { progress: 1, loaded: blob.size, total: blob.size, fromCache: true });
-            return objectUrl;
-          } else {
-            console.log(`Cache invalidated for ${url}. Re-downloading from server...`);
-          }
+          const blob = await cachedResponse.blob();
+          const objectUrl = URL.createObjectURL(blob);
+          this.objectUrls.set(url, objectUrl);
+          this.updateProgress(url, { progress: 1, loaded: blob.size, total: blob.size, fromCache: true });
+          // Non-blocking: update cache if model has changed since last visit
+          this.revalidateInBackground(url, cachedResponse, cache).catch(() => {});
+          return objectUrl;
         }
       } catch (e) {
         console.warn('Cache Storage match failed, falling back to network fetch:', e);

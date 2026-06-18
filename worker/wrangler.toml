@@ -1,0 +1,19 @@
+# AugmenTable global AR-view counter (Cloudflare Worker + D1).
+#
+# One-time deploy (from this `worker/` directory):
+#   1. npx wrangler login                         # authorise your Cloudflare account
+#   2. npx wrangler d1 create augmentable-views   # prints a database_id — paste it below
+#   3. npx wrangler deploy                         # prints the worker URL (…workers.dev)
+#
+# Then point the frontend at it: set VITE_VIEWS_API to that worker URL in the Vercel project
+# env (and in a local .env for dev), and redeploy the frontend. The D1 table is created
+# automatically on the first request — no migration step needed.
+
+name = "augmentable-views"
+main = "src/index.ts"
+compatibility_date = "2024-11-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "augmentable-views"
+database_id = "PASTE_DATABASE_ID_HERE"

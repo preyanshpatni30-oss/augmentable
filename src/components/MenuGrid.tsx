@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Dish } from '../data/types';
 import { DishCard } from './DishCard';
 import { motion, AnimatePresence } from 'motion/react';
-import { ChevronDown, Search, X, Leaf, Flame, Scan, Clock } from 'lucide-react';
+import { ChevronDown, Search, X, Leaf, Flame, Scan, Clock, ArrowUp } from 'lucide-react';
 import { getThemeColors } from '../themeConfig';
 import { getOrderedCategories } from '../config/categoryOrder';
 
@@ -150,7 +150,7 @@ export const MenuGrid: React.FC<MenuGridProps> = ({
   const FILTER_META: Record<FilterKey, { label: string; icon: React.ReactNode }> = {
     veg: { label: 'Veg', icon: <Leaf className="w-3 h-3" /> },
     spicy: { label: 'Spicy', icon: <Flame className="w-3 h-3" /> },
-    ar: { label: 'AR Only', icon: <Scan className="w-3 h-3" /> },
+    ar: { label: 'AR Only', icon: <Scan className="w-6 h-6" /> },
   };
 
   return (
@@ -208,15 +208,33 @@ export const MenuGrid: React.FC<MenuGridProps> = ({
             {availableFilters.map(f => {
               const active = activeFilters.has(f);
               const meta = FILTER_META[f];
+              const isAr = f === 'ar';
+              // AR is the hero feature — render it markedly larger, glowing, and
+              // gently pulsing while inactive so customers can't miss it.
               return (
-                <button
+                <motion.button
                   key={f}
                   onClick={() => toggleFilter(f)}
-                  className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-mono uppercase tracking-wide transition-all active:scale-95"
+                  className={`shrink-0 flex items-center font-mono uppercase tracking-wide transition-colors active:scale-95 ${
+                    isAr ? 'gap-3 px-9 py-4 rounded-full text-lg font-bold' : 'gap-1.5 px-3 py-1.5 rounded-full text-xs'
+                  }`}
+                  animate={isAr && !active ? {
+                    boxShadow: [
+                      `0 0 0px rgba(${t.primaryRgb}, 0)`,
+                      `0 0 22px rgba(${t.primaryRgb}, 0.5)`,
+                      `0 0 0px rgba(${t.primaryRgb}, 0)`,
+                    ],
+                  } : undefined}
+                  transition={isAr && !active ? { duration: 2.4, repeat: Infinity, ease: 'easeInOut' } : undefined}
                   style={active ? {
                     backgroundColor: `rgb(${t.primaryRgb})`,
                     color: 'black',
                     border: `1px solid rgb(${t.primaryRgb})`,
+                    boxShadow: isAr ? `0 0 24px rgba(${t.primaryRgb}, 0.6)` : undefined,
+                  } : isAr ? {
+                    backgroundColor: `rgba(${t.primaryRgb}, 0.16)`,
+                    color: `rgb(${t.accentRgb})`,
+                    border: `1.5px solid rgba(${t.primaryRgb}, 0.55)`,
                   } : {
                     backgroundColor: `rgba(${t.primaryRgb}, 0.06)`,
                     color: 'rgba(255,255,255,0.5)',
@@ -225,8 +243,8 @@ export const MenuGrid: React.FC<MenuGridProps> = ({
                 >
                   {meta.icon}
                   {meta.label}
-                  {active && <X className="w-2.5 h-2.5 ml-0.5" />}
-                </button>
+                  {active && <X className={isAr ? 'w-3.5 h-3.5 ml-0.5' : 'w-2.5 h-2.5 ml-0.5'} />}
+                </motion.button>
               );
             })}
             {activeFilters.size > 0 && (
@@ -239,8 +257,20 @@ export const MenuGrid: React.FC<MenuGridProps> = ({
             )}
           </div>
         )}
+        {/* Instructional cue: make the AR feature self-explanatory for first-time guests */}
+        {availableFilters.includes('ar') && !activeFilters.has('ar') && (
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={{ opacity: [0.55, 1, 0.55] }}
+            transition={{ duration: 2.2, repeat: Infinity, ease: 'easeInOut' }}
+            className="flex items-center gap-1.5 text-[11px] sm:text-xs font-mono text-white/60 pl-1.5"
+          >
+            <ArrowUp className="w-3.5 h-3.5 shrink-0" style={{ color: `rgb(${t.accentRgb})` }} />
+            Tap “AR Only” to view these dishes in 3D on your table
+          </motion.p>
+        )}
         {isMayanagri && filteredDishes === null && (
-          <div className="max-w-xs space-y-1.5 pt-0.5">
+          <div className="max-w-md space-y-1.5 pt-0.5">
             <p className="text-[10px] uppercase tracking-[0.3em] text-white/40 font-mono pl-1">Browse Category</p>
             <select
               value={activeCategory}
@@ -249,7 +279,7 @@ export const MenuGrid: React.FC<MenuGridProps> = ({
                 const menuEl = document.getElementById('menu');
                 if (menuEl) menuEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
               }}
-              className="w-full px-4 py-3 rounded-lg text-sm font-mono uppercase tracking-[0.15em] appearance-none cursor-pointer transition-all border"
+              className="w-full px-4 py-3 rounded-lg text-sm font-mono uppercase tracking-[0.08em] appearance-none cursor-pointer transition-all border truncate"
               style={{
                 borderColor: `rgba(${t.primaryRgb}, 0.4)`,
                 backgroundColor: 'rgb(10, 10, 18)',
@@ -263,11 +293,9 @@ export const MenuGrid: React.FC<MenuGridProps> = ({
               {categories.map((category) => {
                 const displayName = category.replace(/\(\d{1,2}\s*(?:AM|PM).*?\)/, '').trim();
                 const timeInfo = category.match(/\(.*?\)/)?.[0];
-                const isOpen = isCategoryOpenNow(category);
-                const hasTimeRestriction = !!parseCategoryTimeRange(category);
                 return (
                   <option key={category} value={category}>
-                    {hasTimeRestriction ? (isOpen ? '● ' : '○ ') : ''}{displayName}{timeInfo ? ` ${timeInfo}` : ''}
+                    {displayName}{timeInfo ? ` ${timeInfo}` : ''}
                   </option>
                 );
               })}

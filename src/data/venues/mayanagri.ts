@@ -345,21 +345,21 @@ export const data: Cafe = {
       "name": "Muesli Bowl",
       "price": 475,
       "category": "HEALTHY BOWL(9 AM TO 7 PM)",
-      "arEnabled": true
+      "arEnabled": false
     },
     {
       "id": "mg-roasted-veggies-quinoa-bowl",
       "name": "Roasted Veggies & Quinoa Bowl",
       "price": 475,
       "category": "HEALTHY BOWL(9 AM TO 7 PM)",
-      "arEnabled": true
+      "arEnabled": false
     },
     {
       "id": "mg-fresh-fruit-bowl",
       "name": "Fresh Fruit Bowl",
       "price": 475,
       "category": "HEALTHY BOWL(9 AM TO 7 PM)",
-      "arEnabled": true
+      "arEnabled": false
     },
     {
       "id": "mg-picked-veggies-mushroom-panini-sandwich",
@@ -1167,35 +1167,35 @@ export const data: Cafe = {
       "name": "Zucchini and Bell Peppers",
       "price": 575,
       "category": "RISOTTO(12 PM TO 11 PM)",
-      "arEnabled": true
+      "arEnabled": false
     },
     {
       "id": "mg-risotto-sun-dried-tomato",
       "name": "Sun-dried Tomato",
       "price": 575,
       "category": "RISOTTO(12 PM TO 11 PM)",
-      "arEnabled": true,
+      "arEnabled": false,
     },
     {
       "id": "mg-risotto-mushroom",
       "name": "Mushroom",
       "price": 575,
       "category": "RISOTTO(12 PM TO 11 PM)",
-      "arEnabled": true
+      "arEnabled": false
     },
     {
       "id": "mg-risotto-green",
       "name": "Green",
       "price": 575,
       "category": "RISOTTO(12 PM TO 11 PM)",
-      "arEnabled": true
+      "arEnabled": false
     },
     {
       "id": "mg-risotto-three-cheese",
       "name": "Three Cheese",
       "price": 575,
       "category": "RISOTTO(12 PM TO 11 PM)",
-      "arEnabled": true
+      "arEnabled": false
     },
     {
       "id": "mg-baked-lasagna",
@@ -1401,7 +1401,7 @@ export const data: Cafe = {
       "name": "Khow Suey with Rice & Noodles",
       "price": 525,
       "category": "COMBO(12 PM TO 11 PM)",
-      "arEnabled": true
+      "arEnabled": false
     },
     {
       "id": "mg-vegetable-hot-garlic-sauce-rice",

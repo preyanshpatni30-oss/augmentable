@@ -71,6 +71,39 @@ function App() {
     }
   }, [currentCafe]);
 
+  // The page scrolls inside #root (an overflow-y:auto container, see index.css). iOS Safari
+  // resets such a container's scroll to the top when a native overlay — AR Quick Look, the
+  // share sheet, Scene Viewer — is dismissed, which dumped the guest back at the top of the
+  // page after exiting "View in AR". Save the scroll offset whenever the page is hidden and
+  // re-apply it for a few frames once it's shown again, beating iOS's reset. No-op elsewhere.
+  useEffect(() => {
+    const root = document.getElementById('root');
+    if (!root) return;
+    const saved = { y: 0 };
+    const save = () => { saved.y = root.scrollTop; };
+    const restore = () => {
+      if (saved.y <= 0) return;
+      let frames = 0;
+      const reapply = () => {
+        if (Math.abs(root.scrollTop - saved.y) > 1) root.scrollTop = saved.y;
+        if (++frames < 12) requestAnimationFrame(reapply);
+      };
+      requestAnimationFrame(reapply);
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === 'hidden') save();
+      else restore();
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    window.addEventListener('pagehide', save);
+    window.addEventListener('pageshow', restore);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('pagehide', save);
+      window.removeEventListener('pageshow', restore);
+    };
+  }, []);
+
   const isInvalidCafe = !cafeLoading && !!cafeId && !currentCafe;
   const loading = (!!cafeId && cafeLoading);
 

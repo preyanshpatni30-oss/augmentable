@@ -31,21 +31,28 @@ interface FlavorProfileProps {
   accentRgb: string;
   lightRgb: string;
   onClose: () => void;
+  variant?: 'overlay' | 'inline';
 }
 
 export const FlavorProfile = React.memo<FlavorProfileProps>(({
-  dishId, dishName, dishDescription, themeRgb, accentRgb, lightRgb, onClose,
+  dishId, dishName, dishDescription, themeRgb, accentRgb, lightRgb, onClose, variant = 'overlay',
 }) => {
   // Baked profiles cover every dish — instant, no API calls needed.
   // localStorage cache kept as a forward-compat fallback for any future uncovered ID.
   const [data] = useState<FlavorData | null>(() => flavorProfiles[dishId] ?? readCache(dishId));
 
+  const isInline = variant === 'inline';
+
   return (
     <motion.div
-      initial={{ opacity: 0, y: 10 }}
+      initial={{ opacity: 0, y: isInline ? -8 : 10 }}
       animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: 10 }}
-      className="absolute inset-0 z-30 bg-black/90 backdrop-blur-2xl p-6 flex flex-col"
+      exit={{ opacity: 0, y: isInline ? -8 : 10 }}
+      className={isInline
+        ? "relative w-full mt-3 rounded-2xl border border-white/10 p-5 flex flex-col"
+        : "absolute inset-0 z-30 bg-black/90 backdrop-blur-2xl p-6 flex flex-col"
+      }
+      style={isInline ? { background: 'rgba(255,255,255,0.04)' } : undefined}
     >
       <div className="flex justify-between items-center mb-5 border-b border-white/10 pb-3">
         <div className="flex items-center gap-2">
@@ -62,7 +69,7 @@ export const FlavorProfile = React.memo<FlavorProfileProps>(({
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto scrollbar-hide flex flex-col justify-center">
+      <div className={isInline ? "flex flex-col" : "flex-1 overflow-y-auto scrollbar-hide flex flex-col justify-center"}>
         <AnimatePresence mode="wait">
           {data ? (
             <motion.div

@@ -12,7 +12,7 @@ export const MODEL_ORIENTATIONS: Record<string, string> = {
   'mg-avocado-roll': '0deg 0deg 0deg',
   'mg-california': '0deg 0deg 0deg',
   'mg-spicy-shiitake': '0deg 0deg 0deg',
-  'mg-crunchy-paneer-sushi': '0deg -90deg 90deg',
+  'mg-crunchy-paneer-sushi': '0deg 0deg -90deg',
   'mg-crunchy-paneer-bao': '0deg 0deg 0deg',
   'mg-enoki-mushroom-sushi': '0deg 0deg 0deg',
   'mg-crispy-chives': '0deg 0deg 0deg',
@@ -44,6 +44,7 @@ export const MODEL_ORIENTATIONS: Record<string, string> = {
   'mg-crunchy-bao': '0deg 0deg 0deg',
   'mg-cottage-cheese-sun-dried-tomato': '0deg 0deg 0deg',
   'mg-tempura-crunchy-vegetable': '0deg 0deg 0deg',
+  'mg-enoki-mushroom-bao': '0deg 0deg 0deg',
 
   // Street food & combo plates
   'mg-raj-kachori': '0deg 0deg 0deg',

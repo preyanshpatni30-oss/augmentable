@@ -26,11 +26,18 @@
     <!-- CDN preconnects — resolves DNS + TLS before first model fetch -->
     <link rel="preconnect" href="https://pub-b76afc58058348e0bf5af4d8c1ede86a.r2.dev" crossorigin>
     <link rel="dns-prefetch" href="https://pub-b76afc58058348e0bf5af4d8c1ede86a.r2.dev">
+    <!-- Draco mesh decoder host (model-viewer fetches it on first GLB decode) -->
+    <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
+    <link rel="dns-prefetch" href="https://www.gstatic.com">
 
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Playfair+Display:ital,wght@0,400;0,600;1,400&family=Space+Grotesk:wght@300;400;500;600&family=Sora:wght@300;400;500;600;700&family=Cormorant+Garamond:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <!-- Only the 3 primary families the CSS actually renders (Sora / Cormorant Garamond /
+         IBM Plex Mono). Inter, Playfair Display and Space Grotesk were being downloaded but
+         only sat as fallbacks behind the primaries — they never rendered. Dropped to halve
+         the render-blocking font payload and free mobile bandwidth for GLB previews. -->
+    <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=Cormorant+Garamond:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   </head>
   <body class="bg-black text-white antialiased selection:bg-amber-500/30">
     <div id="root"></div>

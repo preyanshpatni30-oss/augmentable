@@ -1,15 +1,17 @@
 import React, { useRef, useState, useEffect, memo, useMemo, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { Dish } from '../data/types';
-import { Scan, Sparkles, Camera, Droplets, ExternalLink } from 'lucide-react';
+import { Scan, Sparkles, Camera, Info, ExternalLink, X } from 'lucide-react';
 import { getThemeColors } from '../themeConfig';
-import { useMotion } from '../context/MotionContext';
 import { FlavorProfile } from './FlavorProfile';
 
 import { R2_PREFIX } from '../config/constants';
 import { modelDownloadManager, DownloadProgress } from '../utils/modelLoader';
 import { getModelRotation } from '../config/modelOrientations';
 import { incrementARView } from '../utils/arViewTracker';
+import { recordGlobalView } from '../utils/globalViews';
+import { acquireViewerSlot } from '../utils/viewerPool';
 
 interface DishCardProps {
   dish: Dish;
@@ -20,7 +22,11 @@ interface DishCardProps {
 }
 
 const isTouchDevice = typeof window !== 'undefined' && ('ontouchstart' in window || navigator.maxTouchPoints > 0);
-const isIOS = typeof window !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent);
+// iPadOS 13+ masquerades as desktop Safari (platform MacIntel) but reports touch points.
+const isIOS = typeof window !== 'undefined' && (
+  /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+  (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+);
 const isAndroid = typeof window !== 'undefined' && /Android/i.test(navigator.userAgent);
 // Embedded webviews (Instagram, Facebook, Snapchat, TikTok, etc.) sandbox the page and
 // silently drop `intent://` navigations — so Scene Viewer never opens and "View in AR"
@@ -28,6 +34,33 @@ const isAndroid = typeof window !== 'undefined' && /Android/i.test(navigator.use
 // Google Search App (GSA) is intentionally excluded: it uses Chrome Custom Tabs where AR works.
 const isInAppBrowser = typeof navigator !== 'undefined' &&
   /FBAN|FBAV|FB_IAB|FBIOS|Instagram|Snapchat|TikTok|musical_ly|BytedanceWebview|Line\/|MicroMessenger|Pinterest|Twitter|LinkedInApp/i.test(navigator.userAgent);
+// ── Scene Viewer failure detection ──
+// The Android intent targets package=com.google.ar.core (Google Play Services for AR).
+// On non-ARCore-certified devices (e.g. OPPO A78) that package isn't installed, so the
+// intent can't resolve and Chrome navigates to S.browser_fallback_url instead. We point
+// that fallback at the CURRENT page plus a marker hash — a same-document hash change
+// (no reload!) — so a `hashchange` to this marker is a definitive "no Scene Viewer on
+// this device" signal. We then show an in-page fullscreen 3D viewer instead.
+// (We deliberately do NOT use the arvr.google.com web URL as the fallback: on a device
+// without the AR-capable Google stack it renders a dead-end error page outside our app,
+// whereas the hash trick keeps the user here with a guaranteed-working 3D view.)
+const SCENE_VIEWER_FALLBACK_HASH = '#no-scene-viewer';
+const SCENE_VIEWER_FAILED_KEY = 'at-scene-viewer-failed';
+let sceneViewerUnresolvable = false;
+try {
+  sceneViewerUnresolvable = typeof sessionStorage !== 'undefined' &&
+    sessionStorage.getItem(SCENE_VIEWER_FAILED_KEY) === '1';
+} catch { /* storage blocked — fall back to in-memory flag only */ }
+const markSceneViewerUnresolvable = () => {
+  sceneViewerUnresolvable = true;
+  try { sessionStorage.setItem(SCENE_VIEWER_FAILED_KEY, '1'); } catch { /* ignore */ }
+};
+// If a stale fallback hash survived a reload (e.g. old deployed build), strip it.
+if (typeof window !== 'undefined' && window.location.hash === SCENE_VIEWER_FALLBACK_HASH) {
+  markSceneViewerUnresolvable();
+  history.replaceState(null, '', window.location.pathname + window.location.search);
+}
+
 // Heuristic for low-end devices (OPPO A78 has 8 cores but limited GPU — memory is the better signal)
 const isLowEnd = typeof navigator !== 'undefined' &&
   ((navigator as any).deviceMemory !== undefined
@@ -40,18 +73,21 @@ const formatSize = (bytes: number) => {
 };
 
 const AR_TIPS = [
-  'Please wait — plating your dish in 3D…',
+  'Plating your dish in AR…',
+  'Opening your camera view',
   'Move your phone slowly once it opens',
   'Tap a flat surface to place the dish',
   'Best viewed on a table or countertop',
-  'Your dish is almost ready to serve',
 ];
 
 const ARLoadingOverlay = React.memo(({
-  dishName, modelProgress, fromCache, loaded, total, themeRgb, accentRgb
+  dishName, modelProgress, fromCache, loaded, total, themeRgb, accentRgb, indeterminate = false,
 }: {
   dishName: string; modelProgress: number; fromCache: boolean;
   loaded: number; total: number; themeRgb: string; accentRgb: string;
+  // indeterminate = the model is downloaded by an external app (Scene Viewer / Quick Look),
+  // so we have no real byte progress. Show a reassuring animated state instead of a stuck 0%.
+  indeterminate?: boolean;
 }) => {
   const [tipIdx, setTipIdx] = useState(0);
 
@@ -60,7 +96,7 @@ const ARLoadingOverlay = React.memo(({
     return () => clearInterval(id);
   }, []);
 
-  const isReady = modelProgress >= 1 || fromCache;
+  const isReady = !indeterminate && (modelProgress >= 1 || fromCache);
 
   return (
     <>
@@ -80,39 +116,58 @@ const ARLoadingOverlay = React.memo(({
       </div>
 
       <div className="space-y-4 w-full max-w-[240px]">
-        <div className="space-y-1 text-center">
+        <div className="space-y-1.5 text-center">
           <p className="font-mono text-[10px] tracking-[0.4em] uppercase text-white/40">AugmenTable AR</p>
+          <h4 className="text-xl font-serif italic text-white leading-tight">{dishName}</h4>
           <AnimatePresence mode="wait">
-            <motion.h4
+            <motion.p
               key={isReady ? 'launch' : 'prepare'}
               initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }}
-              className="text-xl font-serif italic text-white"
+              className="text-[13px] font-light text-white/70"
             >
-              {isReady ? `Opening ${dishName}` : `Preparing ${dishName}`}
-            </motion.h4>
+              {isReady ? 'Opening your camera…' : 'Preparing your dish in AR…'}
+            </motion.p>
           </AnimatePresence>
         </div>
 
         <div className="relative h-1.5 w-full bg-white/10 rounded-full overflow-hidden border border-white/5 shadow-inner">
-          <motion.div
-            className="absolute inset-y-0 left-0"
-            style={{ backgroundColor: `rgb(${themeRgb})`, width: `${Math.max(5, modelProgress * 100)}%`, boxShadow: `0 0 15px rgba(${themeRgb}, 0.5)` }}
-            transition={{ type: 'spring', stiffness: 50, damping: 20 }}
-          />
-          <motion.div
-            animate={{ left: ['-100%', '100%'] }} transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
-            className="absolute inset-y-0 w-20 bg-gradient-to-r from-transparent via-white/30 to-transparent skew-x-12"
-          />
+          {indeterminate ? (
+            // No real byte progress — a sweeping indeterminate bar reads as "working", not stuck.
+            <motion.div
+              className="absolute inset-y-0 w-1/3 rounded-full"
+              style={{ backgroundColor: `rgb(${themeRgb})`, boxShadow: `0 0 15px rgba(${themeRgb}, 0.5)` }}
+              animate={{ left: ['-35%', '100%'] }}
+              transition={{ duration: 1.3, repeat: Infinity, ease: 'easeInOut' }}
+            />
+          ) : (
+            <>
+              <motion.div
+                className="absolute inset-y-0 left-0"
+                style={{ backgroundColor: `rgb(${themeRgb})`, width: `${Math.max(5, modelProgress * 100)}%`, boxShadow: `0 0 15px rgba(${themeRgb}, 0.5)` }}
+                transition={{ type: 'spring', stiffness: 50, damping: 20 }}
+              />
+              <motion.div
+                animate={{ left: ['-100%', '100%'] }} transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
+                className="absolute inset-y-0 w-20 bg-gradient-to-r from-transparent via-white/30 to-transparent skew-x-12"
+              />
+            </>
+          )}
         </div>
 
         <div className="flex justify-between items-center font-mono text-[10px] tracking-wider text-white/50">
-          <span className="uppercase text-[9px] tracking-widest">
-            {fromCache ? 'Instant' : modelProgress > 0 && modelProgress < 1 ? 'Downloading' : isReady ? 'Ready' : 'Initializing'}
-          </span>
-          <span>
-            {total > 0 && !fromCache && modelProgress < 1 ? `${formatSize(loaded)} / ${formatSize(total)} ` : ''}
-            <span className="font-bold text-white">({Math.round(modelProgress * 100)}%)</span>
-          </span>
+          {indeterminate ? (
+            <span className="uppercase text-[9px] tracking-widest mx-auto">Almost ready — hang tight</span>
+          ) : (
+            <>
+              <span className="uppercase text-[9px] tracking-widest">
+                {fromCache ? 'Instant' : modelProgress > 0 && modelProgress < 1 ? 'Downloading' : isReady ? 'Ready' : 'Initializing'}
+              </span>
+              <span>
+                {total > 0 && !fromCache && modelProgress < 1 ? `${formatSize(loaded)} / ${formatSize(total)} ` : ''}
+                <span className="font-bold text-white">({Math.round(modelProgress * 100)}%)</span>
+              </span>
+            </>
+          )}
         </div>
       </div>
 
@@ -151,12 +206,19 @@ export const DishCard = memo<DishCardProps>(({ dish, cafeId, cafeName, index, th
   const [arSessionStatus, setArSessionStatus] = useState<'idle' | 'active' | 'placed' | 'failed'>('idle');
   const [modelUnavailable, setModelUnavailable] = useState(false);
   const [needsChrome, setNeedsChrome] = useState(false);
+  // Fullscreen in-page 3D viewer — last-resort fallback when Scene Viewer can't open
+  const [show3DFallback, setShow3DFallback] = useState(false);
   const [arCapable, setArCapable] = useState<boolean | null>(null);
   // mvLoaded: model-viewer's own onLoad has fired — safe to call activateAR()
   const [mvLoaded, setMvLoaded] = useState(false);
-  const [rotateX, setRotateX] = useState(0);
-  const [rotateY, setRotateY] = useState(0);
-  const { gamma, beta } = useMotion();
+  // Bumped to force a clean <model-viewer> remount after the shared WebGL context is lost
+  // (GPU pressure, or the OS reclaiming it while Scene Viewer/Quick Look was open) — without
+  // this, every preview stays permanently black even though three.js can restore the context.
+  const [mvReloadKey, setMvReloadKey] = useState(0);
+  const lastRecoverRef = useRef(0);
+  // Whether the viewer pool has granted this card a slot to mount its 3D preview. Bounds how
+  // many <model-viewer>s are alive at once so a long AR-filtered list can't exhaust GPU memory.
+  const [hasViewerSlot, setHasViewerSlot] = useState(false);
 
   const t = useMemo(() => getThemeColors(themeColor), [themeColor]);
   
@@ -177,12 +239,13 @@ export const DishCard = memo<DishCardProps>(({ dish, cafeId, cafeName, index, th
   const launchARViewer = useCallback(() => {
     if (modelViewerRef.current && typeof modelViewerRef.current.activateAR === 'function') {
       modelViewerRef.current.activateAR();
-      // Brief delay for native AR viewer handoff
-      setTimeout(() => {
-        setIsLaunching(false);
-        setPendingARLaunch(false);
-      }, 800);
     }
+    // Always dismiss the loading overlay — even if activateAR wasn't available,
+    // leaving isLaunching=true permanently would freeze the card.
+    setTimeout(() => {
+      setIsLaunching(false);
+      setPendingARLaunch(false);
+    }, 800);
   }, []);
 
   // Android: launch Google Scene Viewer directly via an intent URL.
@@ -194,13 +257,46 @@ export const DishCard = memo<DishCardProps>(({ dish, cafeId, cafeName, index, th
   const launchSceneViewer = useCallback(() => {
     const file = encodeURIComponent(glbUrl);
     const title = encodeURIComponent(dish.name);
-    const fallback = encodeURIComponent(window.location.href);
+    // Fallback = current page + marker hash. If the intent can't resolve (no ARCore),
+    // Chrome performs a same-document hash navigation — no reload — which triggerAR
+    // detects via `hashchange` and swaps to the in-page 3D viewer.
+    const fallback = encodeURIComponent(
+      window.location.href.split('#')[0] + SCENE_VIEWER_FALLBACK_HASH
+    );
     const intentUrl =
       `intent://arvr.google.com/scene-viewer/1.0?file=${file}&mode=ar_preferred&title=${title}` +
       `#Intent;scheme=https;package=com.google.ar.core;action=android.intent.action.VIEW;` +
       `S.browser_fallback_url=${fallback};end;`;
     window.location.href = intentUrl;
   }, [glbUrl, dish.name]);
+
+  // iOS RESIDUAL fallback only — the primary Quick Look path is the REAL persistent
+  // rel="ar" anchor rendered around the View-in-AR button (see render below), so the
+  // user's actual tap lands on a genuine Quick Look link with zero programmatic-click
+  // fragility. This synthetic-click variant remains only for the rare non-anchor
+  // entry points (e.g. the pre-visibility placeholder tile). Load-bearing details:
+  //   1. The anchor MUST contain an <img> child, or Safari treats the .usdz href as a
+  //      plain navigation instead of opening Quick Look.
+  //   2. The .click() MUST run synchronously inside the tap gesture to retain user
+  //      activation (same rule as the Android intent navigation).
+  //   3. NEVER hide the anchor with display:none — WebKit ignores clicks on
+  //      display:none rel="ar" anchors on some iOS versions (the original "frozen
+  //      button" bug). Off-screen fixed positioning keeps it click-dispatchable.
+  const launchQuickLook = useCallback(() => {
+    const anchor = document.createElement('a');
+    anchor.setAttribute('rel', 'ar');
+    anchor.href = usdzUrl;
+    const img = document.createElement('img');
+    img.src = 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==';
+    anchor.appendChild(img);
+    anchor.style.position = 'fixed';
+    anchor.style.left = '-9999px';
+    anchor.style.top = '0';
+    document.body.appendChild(anchor);
+    anchor.click();
+    // Quick Look presents its own sheet — no overlay needed; just clean up the node.
+    setTimeout(() => anchor.remove(), 1000);
+  }, [usdzUrl]);
 
   // Reopen the current page in Chrome, escaping an in-app webview (Instagram/FB/etc.)
   // that won't honour the Scene Viewer intent. Once in Chrome, "View in AR" works normally.
@@ -218,11 +314,9 @@ export const DishCard = memo<DishCardProps>(({ dish, cafeId, cafeName, index, th
     setModelLoadingState('loading');
 
     try {
-      // Preload USDZ for iOS devices if we are starting download
-      if (isTouchDevice && /iPad|iPhone|iPod/.test(navigator.userAgent)) {
-        fetch(usdzUrl, { priority: 'low' } as any).catch(() => {});
-      }
-
+      // NOTE: no USDZ prefetch here — AR Quick Look performs its OWN download and does
+      // not reliably share the page's HTTP cache, so warming it up only burns the
+      // user's bandwidth and competes with Quick Look's dial when they tap.
       const objectUrl = await modelDownloadManager.getModel(glbUrl, handleProgress);
       setModelObjectUrl(objectUrl);
       setModelLoaded(true);
@@ -237,14 +331,14 @@ export const DishCard = memo<DishCardProps>(({ dish, cafeId, cafeName, index, th
       setIsLaunching(false);
       setPendingARLaunch(false);
     }
-  }, [glbUrl, usdzUrl, modelLoadingState, handleProgress, dish.name]);
+  }, [glbUrl, modelLoadingState, handleProgress, dish.name]);
 
   // Import model-viewer web component as soon as the card is visible
   useEffect(() => {
-    if (isVisible || isHovered || isLaunching || modelLoadingState === 'loading' || modelLoadingState === 'loaded') {
+    if (isVisible || isHovered || isLaunching || show3DFallback || modelLoadingState === 'loading' || modelLoadingState === 'loaded') {
       void import('@google/model-viewer');
     }
-  }, [isVisible, isHovered, isLaunching, modelLoadingState]);
+  }, [isVisible, isHovered, isLaunching, show3DFallback, modelLoadingState]);
 
   // Reset model state when URL changes
   useEffect(() => {
@@ -303,30 +397,40 @@ export const DishCard = memo<DishCardProps>(({ dish, cafeId, cafeName, index, th
     return () => observer.disconnect();
   }, []);
 
-  // Preload model as soon as card enters viewport
+  // Preload model as soon as card enters viewport.
+  // NOT on iOS: Quick Look downloads the USDZ itself, so the GLB is only an in-page
+  // preview there. The blob pipeline (full GLB buffered in JS memory + a second copy
+  // in Cache Storage, retained for every card ever scrolled past) put enough memory
+  // pressure on iPhone Safari to freeze the tab on multi-dish menus. On iOS we let
+  // model-viewer stream src={glbUrl} directly with its own lazy loading instead, so
+  // only on-screen models are resident.
+  // NOT on Android either: the Android model-viewer streams src={glbUrl} directly
+  // (the blob objectUrl is never used there) and Scene Viewer performs its own GLB
+  // download for AR — so the blob pipeline was pure double-download + memory cost
+  // on exactly the devices least able to afford it.
   useEffect(() => {
-    if (!isVisible || modelLoaded || modelLoadingState !== 'idle') return;
-
-    const timer = setTimeout(() => {
-      loadModel(false);
-    }, 100);
-
-    return () => clearTimeout(timer);
+    if (isIOS || isAndroid || !isVisible || modelLoaded || modelLoadingState !== 'idle') return;
+    loadModel(false);
   }, [isVisible, modelLoaded, modelLoadingState, loadModel]);
 
-  // Load immediately on hover
+  // (No USDZ warm-up fetch on iOS: Quick Look uses its own downloader and does not
+  // reliably hit the page's HTTP cache — the old high-priority warm-up re-fired a
+  // 3-10MB fetch on EVERY scroll-back-into-view and competed with Quick Look itself.)
+
+  // Load immediately on hover (desktop only — iOS/Android stream directly)
   useEffect(() => {
-    if (isHovered && modelLoadingState === 'idle') {
+    if (!isIOS && !isAndroid && isHovered && modelLoadingState === 'idle') {
       loadModel(false);
     }
   }, [isHovered, modelLoadingState, loadModel]);
 
-  // Launch AR once model-viewer itself has finished loading
+  // pendingARLaunch is only used on desktop WebXR. iOS never sets it (Quick Look
+  // launches in-gesture via the rel="ar" anchor; a deferred activateAR() would be
+  // outside user activation and silently ignored), and Android hands off to Scene
+  // Viewer in-gesture. The !isIOS guard is defensive belt-and-braces.
   useEffect(() => {
-    if (pendingARLaunch && mvLoaded) {
-      const timer = setTimeout(() => {
-        launchARViewer();
-      }, 300);
+    if (pendingARLaunch && mvLoaded && !isIOS) {
+      const timer = setTimeout(launchARViewer, 150);
       return () => clearTimeout(timer);
     }
   }, [pendingARLaunch, mvLoaded, launchARViewer]);
@@ -356,9 +460,61 @@ export const DishCard = memo<DishCardProps>(({ dish, cafeId, cafeName, index, th
     return () => mv.removeEventListener('ar-status', onArStatus);
   }, [isLaunching, modelLoaded]);
 
-  // Core AR trigger logic — gated on mvLoaded (model-viewer's own onLoad)
+  // ── WebGL context-loss recovery ──
+  // model-viewer shares ONE WebGL context across every preview on the page. When it's lost
+  // (GPU memory pressure after several models, or the OS reclaiming GPU memory while
+  // Scene Viewer / Quick Look is open), three.js preventDefaults so the browser CAN restore
+  // it — but the canvases don't always repaint, leaving every tile black ("the website goes
+  // black after viewing a few dishes"). model-viewer surfaces the loss as an `error` event
+  // with detail.type==='webglcontextlost' (see onError below) which broadcasts this signal;
+  // every card then remounts its <model-viewer> once so the GPU resources are re-uploaded.
+  useEffect(() => {
+    const onRecover = () => {
+      const now = Date.now();
+      if (now - lastRecoverRef.current < 1200) return; // dedupe the burst from sibling cards
+      lastRecoverRef.current = now;
+      setMvLoaded(false);
+      setModelLoaded(false);
+      setMvReloadKey(k => k + 1);
+    };
+    window.addEventListener('at-webgl-recover', onRecover);
+    return () => window.removeEventListener('at-webgl-recover', onRecover);
+  }, []);
+
+  // Safety net so the "Preparing your dish in AR" overlay can never stick. When the native
+  // AR view opens, the page is hidden — dismiss shortly after. As a last resort, time it out.
+  useEffect(() => {
+    if (!isLaunching) return;
+    const onVisibility = () => { setTimeout(() => setIsLaunching(false), document.hidden ? 300 : 0); };
+    document.addEventListener('visibilitychange', onVisibility);
+    const timer = setTimeout(() => setIsLaunching(false), 6000);
+    return () => { document.removeEventListener('visibilitychange', onVisibility); clearTimeout(timer); };
+  }, [isLaunching]);
+
+  // This card wants its in-page 3D preview when it's on-screen (or being interacted with).
+  // The mobile branches (iOS/Android) only need a preview at all for the in-page poster; AR
+  // itself runs in Scene Viewer / Quick Look, so capping previews never blocks launching AR.
+  const wantsViewer = isVisible && (
+    isIOS || isAndroid || modelLoadingState !== 'idle' || modelLoaded || isHovered || isLaunching || pendingARLaunch
+  );
+
+  // Claim a viewer-pool slot while we want a preview; release it when we don't. The pool caps
+  // concurrent <model-viewer>s so a long AR-filtered list can't crash the tab on memory.
+  useEffect(() => {
+    if (!dish.arEnabled || modelUnavailable || !wantsViewer) {
+      setHasViewerSlot(false);
+      return;
+    }
+    const release = acquireViewerSlot(setHasViewerSlot);
+    return () => { release(); };
+  }, [wantsViewer, dish.arEnabled, modelUnavailable]);
+
+  // Core AR trigger logic. Mobile paths (Android Scene Viewer intent, iOS Quick Look
+  // anchor) launch in-gesture and never wait on the in-page model; only desktop WebXR
+  // is gated on mvLoaded.
   const triggerAR = useCallback(() => {
     incrementARView(dish.id);
+    recordGlobalView(cafeId, dish.id);
     if (typeof navigator.vibrate === 'function') navigator.vibrate(8);
 
     // Android → hand off to Scene Viewer immediately, in-gesture. Does not wait
@@ -370,60 +526,111 @@ export const DishCard = memo<DishCardProps>(({ dish, cafeId, cafeName, index, th
         setNeedsChrome(true);
         return;
       }
+      // Already learned this session that the Scene Viewer intent can't resolve
+      // (no ARCore) — skip the bounce and open the 3D viewer immediately.
+      if (sceneViewerUnresolvable) {
+        setShow3DFallback(true);
+        return;
+      }
       setIsLaunching(true);
-      launchSceneViewer();
-      // Drop the overlay shortly after handoff so it isn't stuck on return.
-      setTimeout(() => setIsLaunching(false), 1500);
+      launchSceneViewer(); // synchronous, in-gesture — required by Chrome
+
+      // ── Post-attempt outcome detection (async is safe AFTER the navigation) ──
+      // Success: the page hides (Scene Viewer activity opened) → dismiss overlay.
+      // Failure: Chrome resolved S.browser_fallback_url, i.e. a same-document hash
+      //   change to our marker (definitive — no ARCore), or nothing at all happened
+      //   within 2.5s → show the in-page fullscreen 3D viewer instead.
+      let settled = false;
+      const cleanup = () => {
+        window.removeEventListener('hashchange', onHashChange);
+        document.removeEventListener('visibilitychange', onVisibility);
+        clearTimeout(failTimer);
+      };
+      const showFallback3D = () => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        setIsLaunching(false);
+        setShow3DFallback(true);
+      };
+      const onHashChange = () => {
+        if (window.location.hash === SCENE_VIEWER_FALLBACK_HASH) {
+          history.replaceState(null, '', window.location.pathname + window.location.search);
+          // Definitive signal — remember it so future taps go straight to 3D.
+          markSceneViewerUnresolvable();
+          showFallback3D();
+        }
+      };
+      const onVisibility = () => {
+        if (document.hidden && !settled) {
+          settled = true;
+          cleanup();
+          // Scene Viewer opened — short pause so the overlay doesn't flash on return
+          setTimeout(() => setIsLaunching(false), 350);
+        }
+      };
+      // Timer fallback is NOT persisted — it may just be a slow app launch; only the
+      // hash marker proves the device truly lacks Scene Viewer.
+      const failTimer = setTimeout(showFallback3D, 2500);
+      window.addEventListener('hashchange', onHashChange);
+      document.addEventListener('visibilitychange', onVisibility);
       return;
     }
 
-    setIsLaunching(true);
+    // iOS → AR Quick Look in-gesture. NOTE: the main View-in-AR button on iOS is a
+    // REAL rel="ar" anchor (rendered below), so this branch only fires from residual
+    // entry points (pre-visibility placeholder tile). One tap, never gated on
+    // mvLoaded — Safari fetches the USDZ itself and shows its own progress UI.
+    // Note: also taken inside iOS in-app browsers — rel="ar" works in
+    // SFSafariViewController and is worth attempting in WKWebViews; the
+    // "Open in Chrome" overlay is an Android-only concept.
+    if (isIOS) {
+      launchQuickLook();
+      return;
+    }
+
+    // Desktop / other WebXR-capable browsers from here down.
     if (mvLoaded) {
+      // Model already loaded — call activateAR() synchronously within this gesture ✓
+      setIsLaunching(true);
       launchARViewer();
     } else {
-      setPendingARLaunch(true);
+      // Start loading if needed; pendingARLaunch fires activateAR once mvLoaded.
       if (modelLoadingState === 'idle') loadModel(false);
+      setIsLaunching(true);
+      setPendingARLaunch(true);
     }
-  }, [mvLoaded, modelLoadingState, loadModel, launchARViewer, launchSceneViewer, dish.id]);
+  }, [mvLoaded, modelLoadingState, loadModel, launchARViewer, launchSceneViewer, launchQuickLook, dish.id, cafeId]);
 
   const handleARClick = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
     triggerAR();
   }, [triggerAR]);
 
+  // iOS View-in-AR anchor tap: just analytics/haptics. Crucially we do NOT
+  // preventDefault — the default navigation of the rel="ar" anchor IS the Quick Look
+  // launch, performed by Safari itself inside the genuine user tap.
+  const handleQuickLookAnchorClick = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    incrementARView(dish.id);
+    recordGlobalView(cafeId, dish.id);
+    if (typeof navigator.vibrate === 'function') navigator.vibrate(8);
+    // Show the "Preparing your dish in AR" overlay while Safari spins up Quick Look (it has
+    // a blank beat before its own sheet appears). The safety-net effect dismisses it once
+    // the page hides (Quick Look opened) or after a timeout — and we must NOT preventDefault,
+    // since the anchor's own navigation IS the Quick Look launch.
+    setIsLaunching(true);
+  }, [dish.id, cafeId]);
 
-  const handleMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
-    const card = e.currentTarget;
-    const box = card.getBoundingClientRect();
-    const x = e.clientX - box.left;
-    const y = e.clientY - box.top;
-    const centerX = box.width / 2;
-    const centerY = box.height / 2;
 
-    const rotateXValue = ((y - centerY) / centerY) * -8;
-    const rotateYValue = ((x - centerX) / centerX) * 8;
-
-    setRotateX(rotateXValue);
-    setRotateY(rotateYValue);
-  }, []);
-
-  const handleMouseLeave = useCallback(() => {
-    setRotateX(0);
-    setRotateY(0);
-  }, []);
-
-  // On desktop, only per-card mouse tilt (rotateX/Y) is applied; global gamma/beta is
-  // a fake mouse→gyro mapping that would animate ALL cards on every mouse move.
-  const finalRotateX = useMemo(() => (
-    isTouchDevice
-      ? rotateX + (beta ? Math.max(-8, Math.min(8, (beta - 45) * -0.12)) : 0)
-      : rotateX
-  ), [rotateX, beta]);
-  const finalRotateY = useMemo(() => (
-    isTouchDevice
-      ? rotateY + (gamma ? Math.max(-8, Math.min(8, gamma * 0.12)) : 0)
-      : rotateY
-  ), [rotateY, gamma]);
+  // NOTE: the per-card 3D tilt (mouse) and the global device-orientation tilt were both
+  // removed, and the card no longer uses preserve-3d / perspective / translateZ. That whole
+  // 3D system pushed each card's media + content onto separate compositor layers within a
+  // preserve-3d context; on low-end mobile GPUs (e.g. OPPO A78 WebView) those 3D layers
+  // intermittently bled across cards while scrolling — the "models overlapping / looking
+  // broken" report. Flat cards composite as ordinary 2D layers and cannot overlap on any
+  // device. Hover depth is still conveyed by the glow + media scale-105, and each model
+  // still auto-rotates in its viewer.
 
   const handleShare = useCallback(async () => {
     if (!navigator.share) return;
@@ -443,20 +650,16 @@ export const DishCard = memo<DishCardProps>(({ dish, cafeId, cafeName, index, th
     }
   }, [dish.name, dish.description]);
 
+  // Small cards (no 3D media area) can't host the full-card flavor overlay —
+  // they get the inline dropdown variant inside the content flow instead.
+  const hasMediaArea = dish.arEnabled === true && !modelUnavailable;
+
   return (
     <motion.div
       ref={cardRef}
       initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0, rotateX: finalRotateX, rotateY: finalRotateY }}
-      transition={{
-        delay: index * 0.05,
-        duration: 0.5,
-        rotateX: { type: "spring", stiffness: 300, damping: 30 },
-        rotateY: { type: "spring", stiffness: 300, damping: 30 }
-      }}
-      onMouseMove={handleMouseMove}
-      onMouseLeave={handleMouseLeave}
-      style={{ transformPerspective: 1000, transformStyle: "preserve-3d" }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: index * 0.05, duration: 0.5 }}
       className="group relative h-full w-full"
     >
       <div
@@ -479,7 +682,6 @@ export const DishCard = memo<DishCardProps>(({ dish, cafeId, cafeName, index, th
 
       <div
         className="relative overflow-hidden rounded-3xl glass-liquid glass-liquid-hover flex flex-col h-full group/card"
-        style={{ transformStyle: "preserve-3d" }}
         onMouseEnter={() => setIsHovered(true)}
       >
         <AnimatePresence>
@@ -524,6 +726,9 @@ export const DishCard = memo<DishCardProps>(({ dish, cafeId, cafeName, index, th
                   total={total}
                   themeRgb={t.primaryRgb}
                   accentRgb={t.accentRgb}
+                  // On mobile the AR model is fetched by Scene Viewer / Quick Look, not us —
+                  // there's no real byte progress, so show the reassuring indeterminate state.
+                  indeterminate={isIOS || isAndroid}
                 />
               )}
             </motion.div>
@@ -574,19 +779,76 @@ export const DishCard = memo<DishCardProps>(({ dish, cafeId, cafeName, index, th
           )}
         </AnimatePresence>
 
-        <div className="absolute inset-0 z-20 pointer-events-none opacity-0 group-hover/card:opacity-100 transition-opacity duration-700">
-           <motion.div
-             animate={{ top: ['-10%', '110%'] }}
-             transition={{ duration: 3, ease: "linear", repeat: Infinity }}
-             className="absolute left-0 right-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent"
-             style={{
-               boxShadow: `0 0 20px rgba(${t.primaryRgb}, 0.2)`
-             }}
-           />
-        </div>
+        {/* AR-unsupported fallback: fullscreen interactive 3D view. Portaled to <body> so
+            it's never affected by any transform/stacking context on an ancestor card. */}
+        {show3DFallback && createPortal(
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="fixed inset-0 z-[999] bg-[#020204] flex flex-col"
+          >
+            <div className="flex items-center justify-between gap-3 px-4 pt-4 pb-2" style={{ paddingTop: 'max(1rem, env(safe-area-inset-top))' }}>
+              <div className="min-w-0">
+                <p className="font-mono text-[9px] tracking-[0.3em] uppercase text-white/35">
+                  AR not supported on this device — showing 3D view
+                </p>
+                <h4 className="text-lg font-serif italic text-white truncate">{dish.name}</h4>
+              </div>
+              <button
+                onClick={() => setShow3DFallback(false)}
+                aria-label="Close 3D view"
+                className="p-3 rounded-full bg-white/10 border border-white/20 text-white shrink-0 active:scale-95"
+              >
+                <X className="w-5 h-5" aria-hidden="true" />
+              </button>
+            </div>
+            <div className="flex-1 min-h-0">
+              <model-viewer
+                src={isAndroid ? glbUrl : (modelObjectUrl || glbUrl)}
+                alt={dish.name}
+                camera-controls
+                auto-rotate
+                camera-orbit="0deg 65deg 105%"
+                interaction-prompt="none"
+                shadow-intensity={isLowEnd ? '0.4' : '0.8'}
+                shadow-softness="0.8"
+                exposure="1.1"
+                tone-mapping="commerce"
+                environment-image="neutral"
+                loading="eager"
+                reveal="auto"
+                draco-decoder-config="https://www.gstatic.com/draco/versioned/decoders/1.5.7/"
+                orientation={getModelRotation(dish.id, dish.rotation)}
+                style={{ width: '100%', height: '100%', backgroundColor: 'transparent' } as any}
+              />
+            </div>
+            <p
+              className="text-center text-[11px] font-light text-white/40 italic px-6 pb-4"
+              style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}
+            >
+              Drag to rotate · pinch to zoom
+            </p>
+          </motion.div>,
+          document.body
+        )}
+
+        {/* Hover-only scan line — render only while on-screen so a long AR-filtered list
+            isn't running dozens of off-screen infinite animations on a low-end device. */}
+        {isVisible && (
+          <div className="absolute inset-0 z-20 pointer-events-none opacity-0 group-hover/card:opacity-100 transition-opacity duration-700">
+             <motion.div
+               animate={{ top: ['-10%', '110%'] }}
+               transition={{ duration: 3, ease: "linear", repeat: Infinity }}
+               className="absolute left-0 right-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent"
+               style={{
+                 boxShadow: `0 0 20px rgba(${t.primaryRgb}, 0.2)`
+               }}
+             />
+          </div>
+        )}
 
         {dish.arEnabled === true && !modelUnavailable && (
-          <div className="relative h-64 w-full shrink-0 group-hover/card:scale-105 transition-transform duration-700 overflow-hidden" style={{ transform: "translateZ(25px)" }}>
+          <div className="relative h-64 w-full shrink-0 group-hover/card:scale-105 transition-transform duration-700 overflow-hidden">
             {/* Living themed backdrop — keeps the tile from ever looking grey/empty while
                 the 3D model downloads & decodes. The drifting glow blobs only render until
                 the model reveals, so loaded cards don't perpetually animate (low-end GPU). */}
@@ -595,7 +857,7 @@ export const DishCard = memo<DishCardProps>(({ dish, cafeId, cafeName, index, th
                 className="absolute inset-0"
                 style={{ background: `radial-gradient(120% 80% at 50% 0%, rgba(${t.primaryRgb}, 0.12), transparent 70%), linear-gradient(160deg, rgba(${t.accentRgb}, 0.05), transparent 60%)` }}
               />
-              {!mvLoaded && (
+              {isVisible && !mvLoaded && (
                 <>
                   <motion.div
                     aria-hidden
@@ -621,11 +883,12 @@ export const DishCard = memo<DishCardProps>(({ dish, cafeId, cafeName, index, th
 
             <div className="absolute inset-0 bg-gradient-to-t from-[#020204] via-transparent to-transparent z-10 pointer-events-none" />
 
-            {isVisible && (modelLoadingState !== 'idle' || modelLoaded || isHovered || isLaunching || pendingARLaunch) ? (
+            {wantsViewer && (hasViewerSlot || isLaunching || pendingARLaunch) ? (
               <div className="w-full h-full relative z-[1]">
                 <model-viewer
+                  key={mvReloadKey}
                   ref={modelViewerRef}
-                  src={isAndroid ? glbUrl : (modelObjectUrl || glbUrl)}
+                  src={(isAndroid || isIOS) ? glbUrl : (modelObjectUrl || glbUrl)}
                   ios-src={usdzUrl}
                   alt={dish.name}
                   ar
@@ -640,11 +903,27 @@ export const DishCard = memo<DishCardProps>(({ dish, cafeId, cafeName, index, th
                   exposure="1.1"
                   tone-mapping="commerce"
                   environment-image="neutral"
-                  loading="eager"
+                  loading={(isIOS || isAndroid) ? 'lazy' : 'eager'}
                   reveal="auto"
                   draco-decoder-config="https://www.gstatic.com/draco/versioned/decoders/1.5.7/"
                   onLoad={() => { setModelLoaded(true); setMvLoaded(true); }}
-                  onError={() => { setIsLaunching(false); setPendingARLaunch(false); if (modelLoadingState !== 'loaded') setModelLoadingState('error'); }}
+                  onError={(e: any) => {
+                    // model-viewer reports a lost shared WebGL context as an `error` with
+                    // detail.type==='webglcontextlost'. Broadcast so every preview on the page
+                    // remounts and re-uploads to the GPU instead of staying black. (This is a
+                    // recoverable runtime event — NOT a model load failure — so don't flip to
+                    // the 'error' state, which would hide the dish's whole media area.)
+                    // detail may live on the native event or a SyntheticEvent's nativeEvent.
+                    const detail = e?.detail ?? e?.nativeEvent?.detail;
+                    if (detail?.type === 'webglcontextlost') {
+                      try { detail.sourceError?.preventDefault?.(); } catch {}
+                      window.dispatchEvent(new Event('at-webgl-recover'));
+                      return;
+                    }
+                    setIsLaunching(false);
+                    setPendingARLaunch(false);
+                    if (modelLoadingState !== 'loaded') setModelLoadingState('error');
+                  }}
                   orientation={getModelRotation(dish.id, dish.rotation)}
                   className="w-full h-full bg-transparent"
                   style={{ '--poster-color': 'transparent' } as any}
@@ -710,7 +989,7 @@ export const DishCard = memo<DishCardProps>(({ dish, cafeId, cafeName, index, th
         )}
 
           <AnimatePresence>
-            {showFlavor && (
+            {showFlavor && hasMediaArea && (
               <FlavorProfile
                 dishId={dish.id}
                 dishName={dish.name}
@@ -724,7 +1003,7 @@ export const DishCard = memo<DishCardProps>(({ dish, cafeId, cafeName, index, th
           </AnimatePresence>
 
 
-        <div className="absolute top-4 right-4 z-[100] flex flex-col gap-2">
+        <div className="absolute top-4 right-4 z-[100] flex flex-col items-center gap-2">
           <button
             onClick={handleShare}
             aria-label={`Share ${dish.name}`}
@@ -734,16 +1013,35 @@ export const DishCard = memo<DishCardProps>(({ dish, cafeId, cafeName, index, th
           </button>
           <button
             onClick={() => setShowFlavor(v => !v)}
-            aria-label={showFlavor ? 'Close flavor profile' : 'View AI flavor profile'}
-            className="p-3 rounded-full bg-white/20 backdrop-blur-3xl border border-white/30 text-white shadow-[0_0_30px_rgba(255,255,255,0.2)] transition-all active:scale-95"
+            aria-label={showFlavor ? 'Close info' : 'View dish info and ingredients'}
+            className="flex items-center gap-1.5 pl-2.5 pr-3 py-2 rounded-full bg-white/20 backdrop-blur-3xl border border-white/30 text-white text-xs font-bold uppercase tracking-wide shadow-[0_0_30px_rgba(255,255,255,0.2)] transition-all active:scale-95"
           >
-            <Droplets className="w-5 h-5" aria-hidden="true" />
+            {showFlavor
+              ? <X className="w-4 h-4" aria-hidden="true" />
+              : <Info className="w-4 h-4" aria-hidden="true" />}
+            <span>{showFlavor ? 'Close' : 'Info'}</span>
           </button>
         </div>
 
-        <div className="p-6 flex flex-col flex-1" style={{ transform: "translateZ(30px)" }}>
+        <div className="p-6 flex flex-col flex-1">
           <h3 className="text-2xl font-serif text-white mb-2 leading-tight pr-12">{dish.name}</h3>
           <p className="text-white/50 text-sm font-light leading-relaxed mb-6 line-clamp-2 flex-1">{dish.description}</p>
+
+          {/* Small cards: flavor profile drops down inside the content flow */}
+          <AnimatePresence>
+            {showFlavor && !hasMediaArea && (
+              <FlavorProfile
+                dishId={dish.id}
+                dishName={dish.name}
+                dishDescription={dish.description}
+                themeRgb={t.primaryRgb}
+                accentRgb={t.accentRgb}
+                lightRgb={t.lightRgb}
+                onClose={() => setShowFlavor(false)}
+                variant="inline"
+              />
+            )}
+          </AnimatePresence>
 
           <div className="mt-auto flex flex-col gap-4">
             <p className="font-mono text-xl font-bold tracking-tight" style={{ color: `rgb(${t.accentRgb})` }}>
@@ -751,7 +1049,10 @@ export const DishCard = memo<DishCardProps>(({ dish, cafeId, cafeName, index, th
             </p>
 
             {dish.arEnabled === true && !modelUnavailable && (
-              arCapable === false ? (
+              /* arCapable comes from the in-page model-viewer, which iOS does not use
+                 for AR (Quick Look is a Safari-native anchor navigation) — so never
+                 let a false reading hide the AR button on iOS. */
+              (!isAndroid && !isIOS && arCapable === false) ? (
                 <div
                   className="flex items-center gap-3 rounded-2xl px-4 py-3"
                   style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}
@@ -764,23 +1065,47 @@ export const DishCard = memo<DishCardProps>(({ dish, cafeId, cafeName, index, th
                 </div>
               ) : (
                 <div className="flex gap-3">
-                  <button
-                    onClick={arSessionStatus === 'failed'
-                      ? () => { setArSessionStatus('idle'); triggerAR(); }
-                      : handleARClick}
-                    className="flex-1 py-4 px-6 rounded-2xl text-black flex items-center justify-center gap-2.5 text-sm font-bold transition-all active:scale-95"
-                    style={{
-                      backgroundColor: arSessionStatus === 'failed'
-                        ? 'rgb(239 68 68)'
-                        : `rgb(${t.primaryRgb})`,
-                      color: arSessionStatus === 'failed' ? 'white' : 'black'
-                    }}
-                  >
-                    <Scan className="w-5 h-5" />
-                    <span className="tracking-[0.1em] uppercase">
-                      {arSessionStatus === 'failed' ? 'Retry AR' : 'View in AR'}
-                    </span>
-                  </button>
+                  {isIOS ? (
+                    /* iOS gold standard: the View-in-AR "button" IS a real persistent
+                       rel="ar" anchor, so the user's actual tap is a genuine Quick Look
+                       navigation handled natively by Safari — zero programmatic-click
+                       fragility, always inside the user gesture, never gated on the
+                       in-page model. The zero-sized <img> first child is load-bearing:
+                       without an <img> inside the anchor, Safari treats the .usdz href
+                       as a plain file navigation instead of opening Quick Look. */
+                    <a
+                      rel="ar"
+                      href={usdzUrl}
+                      onClick={handleQuickLookAnchorClick}
+                      className="flex-1 py-4 px-6 rounded-2xl flex items-center justify-center gap-2.5 text-sm font-bold transition-all active:scale-95"
+                      style={{ backgroundColor: `rgb(${t.primaryRgb})`, color: 'black', textDecoration: 'none' }}
+                    >
+                      <img
+                        src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw=="
+                        alt="" aria-hidden="true" style={{ width: 0, height: 0, opacity: 0 }}
+                      />
+                      <Scan className="w-5 h-5" />
+                      <span className="tracking-[0.1em] uppercase">View in AR</span>
+                    </a>
+                  ) : (
+                    <button
+                      onClick={arSessionStatus === 'failed'
+                        ? () => { setArSessionStatus('idle'); triggerAR(); }
+                        : handleARClick}
+                      className="flex-1 py-4 px-6 rounded-2xl flex items-center justify-center gap-2.5 text-sm font-bold transition-all active:scale-95"
+                      style={{
+                        backgroundColor: arSessionStatus === 'failed'
+                          ? 'rgb(239 68 68)'
+                          : `rgb(${t.primaryRgb})`,
+                        color: arSessionStatus === 'failed' ? 'white' : 'black'
+                      }}
+                    >
+                      <Scan className="w-5 h-5" />
+                      <span className="tracking-[0.1em] uppercase">
+                        {arSessionStatus === 'failed' ? 'Retry AR' : 'View in AR'}
+                      </span>
+                    </button>
+                  )}
                 </div>
               )
             )}
