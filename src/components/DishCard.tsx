@@ -908,12 +908,16 @@ export const DishCard = memo<DishCardProps>(({ dish, cafeId, cafeName, index, th
                   key={mvReloadKey}
                   ref={modelViewerRef}
                   src={(isAndroid || isIOS) ? glbUrl : (modelObjectUrl || glbUrl)}
-                  ios-src={usdzUrl}
+                  ios-src={!isAndroid ? usdzUrl : undefined}
                   alt={dish.name}
-                  ar
-                  ar-modes={isIOS ? 'quick-look scene-viewer webxr' : 'scene-viewer webxr quick-look'}
-                  ar-scale="auto"
-                  ar-placement="floor"
+                  // AR capability detection is only needed on desktop — iOS uses the rel="ar"
+                  // anchor, Android uses Scene Viewer. Removing these on mobile eliminates
+                  // Quick Look / WebXR init overhead on every card mount, which speeds up the
+                  // first model appearing on-screen.
+                  ar={(isAndroid || isIOS) ? undefined : ('' as any)}
+                  ar-modes={(!isAndroid && !isIOS) ? 'webxr scene-viewer quick-look' : undefined}
+                  ar-scale={(!isAndroid && !isIOS) ? 'auto' : undefined}
+                  ar-placement={(!isAndroid && !isIOS) ? 'floor' : undefined}
                   auto-rotate
                   camera-orbit="0deg 65deg 105%"
                   interaction-prompt="none"
@@ -922,7 +926,7 @@ export const DishCard = memo<DishCardProps>(({ dish, cafeId, cafeName, index, th
                   exposure="1.1"
                   tone-mapping="commerce"
                   environment-image="neutral"
-                  loading={(isIOS || isAndroid) ? 'lazy' : 'eager'}
+                  loading="eager"
                   reveal="auto"
                   draco-decoder-config="https://www.gstatic.com/draco/versioned/decoders/1.5.7/"
                   onLoad={() => { setModelLoaded(true); setMvLoaded(true); }}
