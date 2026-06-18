@@ -21,6 +21,10 @@ function computeMax(): number {
   // On phones the bottleneck is the GPU, not RAM (the OPPO A78 has plenty of RAM but a weak
   // GPU that crashes once several models are resident), so cap mobile low regardless of the
   // reported memory; desktop GPUs can hold far more.
+  // Android WebView accumulates GPU textures faster than iOS WebKit (which has its own memory
+  // pressure handling), so Android gets a lower hard cap.
+  const isAndroid = /Android/i.test(ua);
+  if (isAndroid) return 2;
   if (isMobile) return typeof mem === 'number' && mem <= 3 ? 3 : 4;
   if (typeof mem === 'number' && mem <= 4) return 6;
   return 12;
