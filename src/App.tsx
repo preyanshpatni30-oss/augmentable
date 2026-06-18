@@ -50,10 +50,40 @@ function App() {
   
   const { cafeId, tableParam } = useMemo(() => {
     const params = new URLSearchParams(window.location.search);
-    return {
-      cafeId: params.get('cafe'),
-      tableParam: params.get('table') || ''
-    };
+    const urlCafe = params.get('cafe');
+    const urlTable = params.get('table') || '';
+
+    if (urlCafe) {
+      // Persist so we can restore if Android Chrome drops query params on returning from
+      // Scene Viewer (intent:// navigation can strip search params on some Chrome versions).
+      // Also write to localStorage as a crash-safe backup — sessionStorage is wiped when
+      // a tab OOM-crashes (e.g. while scrolling the AR-Only filter on a low-end phone)
+      // and the browser reloads the root URL, but localStorage survives tab crashes.
+      try { sessionStorage.setItem('at-cafe', urlCafe); } catch {}
+      try { if (urlTable) sessionStorage.setItem('at-table', urlTable); } catch {}
+      try { localStorage.setItem('at-cafe-crash', urlCafe); } catch {}
+      try { if (urlTable) localStorage.setItem('at-table-crash', urlTable); } catch {}
+      try { localStorage.setItem('at-cafe-crash-time', String(Date.now())); } catch {}
+      return { cafeId: urlCafe, tableParam: urlTable };
+    }
+
+    // No params in URL — try to restore from this tab session (same-tab return from AR).
+    try {
+      const saved = sessionStorage.getItem('at-cafe');
+      if (saved) return { cafeId: saved, tableParam: sessionStorage.getItem('at-table') ?? '' };
+    } catch {}
+
+    // Last resort: crash-recovery from localStorage. Only use if the page was loaded very
+    // recently (< 30 s) to avoid re-opening a cafe the user explicitly navigated away from.
+    try {
+      const crashSaved = localStorage.getItem('at-cafe-crash');
+      const crashTime = localStorage.getItem('at-cafe-crash-time');
+      if (crashSaved && crashTime && Date.now() - Number(crashTime) < 30_000) {
+        return { cafeId: crashSaved, tableParam: localStorage.getItem('at-table-crash') ?? '' };
+      }
+    } catch {}
+
+    return { cafeId: null as string | null, tableParam: '' };
   }, []);
 
   const { cafe: currentCafe, loading: cafeLoading } = useCafe(cafeId);

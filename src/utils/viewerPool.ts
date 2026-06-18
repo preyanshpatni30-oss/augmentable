@@ -18,14 +18,15 @@ function computeMax(): number {
   const ua = navigator.userAgent || '';
   const isMobile = /Android|iPhone|iPad|iPod/i.test(ua);
   const mem = (navigator as any).deviceMemory as number | undefined;
-  // On phones the bottleneck is the GPU, not RAM (the OPPO A78 has plenty of RAM but a weak
-  // GPU that crashes once several models are resident), so cap mobile low regardless of the
-  // reported memory; desktop GPUs can hold far more.
-  // Android WebView accumulates GPU textures faster than iOS WebKit (which has its own memory
-  // pressure handling), so Android gets a lower hard cap.
+  // On phones the bottleneck is the GPU, not RAM. The AR-Only filter lists every AR dish
+  // in a single column; without a tight cap, scrolling that list mounts model-viewer after
+  // model-viewer until the tab OOM-crashes and reloads (stripping the ?cafe= param).
+  // Android WebView accumulates GPU textures faster than iOS WebKit, so Android gets a
+  // hard cap of 1 (one live preview at a time). iOS WebKit handles its own memory pressure
+  // better, but low-memory iPhones still need a tighter cap.
   const isAndroid = /Android/i.test(ua);
-  if (isAndroid) return 2;
-  if (isMobile) return typeof mem === 'number' && mem <= 3 ? 3 : 4;
+  if (isAndroid) return 1;
+  if (isMobile) return typeof mem === 'number' && mem <= 3 ? 2 : 3;
   if (typeof mem === 'number' && mem <= 4) return 6;
   return 12;
 }

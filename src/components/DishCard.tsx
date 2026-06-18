@@ -381,7 +381,12 @@ export const DishCard = memo<DishCardProps>(({ dish, cafeId, cafeName, index, th
     if (typeof capable === 'boolean') setArCapable(capable);
   }, [mvLoaded, dish.arEnabled]);
 
-  // Intersection Observer for scroll performance
+  // Intersection Observer for scroll performance.
+  // On mobile, use no rootMargin — cards are only "visible" when actually on screen.
+  // This is critical for the AR-Only filter which lists every AR dish in a long column:
+  // the 100px pre-trigger caused too many cards to be simultaneously "visible",
+  // exhausting GPU memory (tab OOM crash → reload to home). Desktop keeps the margin
+  // for smooth model preloading.
   useEffect(() => {
     const observer = new IntersectionObserver(
       ([entry]) => {
@@ -391,7 +396,7 @@ export const DishCard = memo<DishCardProps>(({ dish, cafeId, cafeName, index, th
           setIsVisible(false);
         }
       },
-      { threshold: 0.1, rootMargin: '100px' }
+      { threshold: 0.05, rootMargin: (isIOS || isAndroid) ? '0px' : '100px' }
     );
     if (cardRef.current) observer.observe(cardRef.current);
     return () => observer.disconnect();
@@ -689,6 +694,7 @@ export const DishCard = memo<DishCardProps>(({ dish, cafeId, cafeName, index, th
 
       <div
         className="relative overflow-hidden rounded-3xl glass-liquid glass-liquid-hover flex flex-col h-full group/card"
+        style={{ isolation: 'isolate' }}
         onMouseEnter={() => setIsHovered(true)}
       >
         <AnimatePresence>
@@ -855,7 +861,12 @@ export const DishCard = memo<DishCardProps>(({ dish, cafeId, cafeName, index, th
         )}
 
         {dish.arEnabled === true && !modelUnavailable && (
-          <div className="relative h-64 w-full shrink-0 group-hover/card:scale-105 transition-transform duration-700 overflow-hidden">
+          // overflow-hidden + contain:strict are both required to clip the WebGL canvas.
+          // CSS overflow:hidden alone does NOT clip model-viewer's WebGL canvas on Android
+          // WebView — the GPU compositor draws it above CSS clipping boundaries, causing
+          // the model to visually bleed into the next card. `contain:strict` forces an
+          // isolated paint/composite context that actually clips the canvas.
+          <div className="relative h-64 w-full shrink-0 overflow-hidden" style={{ contain: 'strict' }}>
             {/* Living themed backdrop — keeps the tile from ever looking grey/empty while
                 the 3D model downloads & decodes. The drifting glow blobs only render until
                 the model reveals, so loaded cards don't perpetually animate (low-end GPU). */}
@@ -891,7 +902,8 @@ export const DishCard = memo<DishCardProps>(({ dish, cafeId, cafeName, index, th
             <div className="absolute inset-0 bg-gradient-to-t from-[#020204] via-transparent to-transparent z-10 pointer-events-none" />
 
             {wantsViewer && (hasViewerSlot || isLaunching || pendingARLaunch) ? (
-              <div className="w-full h-full relative z-[1]">
+              <div className="w-full h-full relative z-[1] overflow-hidden" style={{ contain: 'strict' }}>
+
                 <model-viewer
                   key={mvReloadKey}
                   ref={modelViewerRef}
