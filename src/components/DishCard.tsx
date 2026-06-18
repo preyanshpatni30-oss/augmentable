@@ -494,8 +494,12 @@ export const DishCard = memo<DishCardProps>(({ dish, cafeId, cafeName, index, th
   // This card wants its in-page 3D preview when it's on-screen (or being interacted with).
   // The mobile branches (iOS/Android) only need a preview at all for the in-page poster; AR
   // itself runs in Scene Viewer / Quick Look, so capping previews never blocks launching AR.
-  const wantsViewer = isVisible && (
-    isIOS || isAndroid || modelLoadingState !== 'idle' || modelLoaded || isHovered || isLaunching || pendingARLaunch
+  // Android Scene Viewer handles the AR download itself — it doesn't need an in-page
+  // <model-viewer> preview. Mounting one for every visible card in a long AR-filtered
+  // list accumulates GPU memory (model-viewer doesn't fully free textures on unmount)
+  // until the tab is OOM-killed. Android cards always show the placeholder instead.
+  const wantsViewer = !isAndroid && isVisible && (
+    isIOS || modelLoadingState !== 'idle' || modelLoaded || isHovered || isLaunching || pendingARLaunch
   );
 
   // Claim a viewer-pool slot while we want a preview; release it when we don't. The pool caps
