@@ -108,9 +108,11 @@ export const Header: React.FC<HeaderProps> = ({ cafe, tableNumber }) => {
   const handleNavigate = (section: 'menu' | 'chef') => {
     setActiveSection(section);
     const el = document.getElementById(section);
-    if (el) {
-      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
+    const root = document.getElementById('root');
+    if (!el || !root) return;
+    // Explicitly scroll #root — body is position:fixed so window can't scroll,
+    // and Safari doesn't always propagate scrollIntoView to the overflow:auto container.
+    root.scrollTo({ top: root.scrollTop + el.getBoundingClientRect().top - root.getBoundingClientRect().top, behavior: 'smooth' });
   };
 
   const menuButton = useMagnetic(0.2);
@@ -153,7 +155,9 @@ export const Header: React.FC<HeaderProps> = ({ cafe, tableNumber }) => {
         `S.browser_fallback_url=${fallback};end;`;
       return;
     }
-    document.getElementById('menu')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    const menuEl = document.getElementById('menu');
+    const root = document.getElementById('root');
+    if (menuEl && root) root.scrollTo({ top: root.scrollTop + menuEl.getBoundingClientRect().top - root.getBoundingClientRect().top, behavior: 'smooth' });
   };
 
   return (

@@ -2,7 +2,7 @@
 // Maps themeColor string to actual RGB values and Tailwind-compatible styles
 
 export interface ThemeColors {
-  /** Primary color RGB e.g. "245 158 11" for use in rgba() */
+  /** Primary color RGB e.g. "245, 158, 11" — comma-separated so both rgb() and rgba() are valid on Safari */
   primaryRgb: string;
   /** Accent/lighter variant RGB */
   accentRgb: string;
@@ -12,14 +12,14 @@ export interface ThemeColors {
 
 const themes: Record<string, ThemeColors> = {
   amber: {
-    primaryRgb: '245 158 11',   // amber-500
-    accentRgb: '251 191 36',    // amber-400
-    lightRgb: '252 211 77',     // amber-300
+    primaryRgb: '245, 158, 11',   // amber-500
+    accentRgb: '251, 191, 36',    // amber-400
+    lightRgb: '252, 211, 77',     // amber-300
   },
   warm: {
-    primaryRgb: '210 130 80',   // terracotta-caramel — Croft House
-    accentRgb: '232 155 100',   // warm peach
-    lightRgb: '248 190 145',    // soft blush
+    primaryRgb: '210, 130, 80',   // terracotta-caramel — Croft House
+    accentRgb: '232, 155, 100',   // warm peach
+    lightRgb: '248, 190, 145',    // soft blush
   },
 };
 

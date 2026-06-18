@@ -277,7 +277,8 @@ export const MenuGrid: React.FC<MenuGridProps> = ({
               onChange={(e) => {
                 setActiveCategory(e.target.value);
                 const menuEl = document.getElementById('menu');
-                if (menuEl) menuEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                const root = document.getElementById('root');
+                if (menuEl && root) root.scrollTo({ top: root.scrollTop + menuEl.getBoundingClientRect().top - root.getBoundingClientRect().top, behavior: 'smooth' });
               }}
               className="w-full px-4 py-3 rounded-lg text-sm font-mono uppercase tracking-[0.08em] appearance-none cursor-pointer transition-all border truncate"
               style={{
