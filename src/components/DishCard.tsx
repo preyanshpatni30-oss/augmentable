@@ -211,6 +211,9 @@ export const DishCard = memo<DishCardProps>(({ dish, cafeId, cafeName, index, th
   const [arCapable, setArCapable] = useState<boolean | null>(null);
   // mvLoaded: model-viewer's own onLoad has fired — safe to call activateAR()
   const [mvLoaded, setMvLoaded] = useState(false);
+  // Real 0→1 download/decode progress of the in-page preview, from model-viewer's `progress`
+  // event — drives the inline loading indicator so the tile reads as "working", not broken.
+  const [inlineProgress, setInlineProgress] = useState(0);
   // Bumped to force a clean <model-viewer> remount after the shared WebGL context is lost
   // (GPU pressure, or the OS reclaiming it while Scene Viewer/Quick Look was open) — without
   // this, every preview stays permanently black even though three.js can restore the context.
@@ -353,6 +356,7 @@ export const DishCard = memo<DishCardProps>(({ dish, cafeId, cafeName, index, th
     });
     setModelLoaded(false);
     setMvLoaded(false);
+    setInlineProgress(0);
     setArCapable(null);
     setModelProgressInfo({ progress: 0, loaded: 0, total: 0, fromCache: false });
     setModelLoadingState('idle');
@@ -470,6 +474,19 @@ export const DishCard = memo<DishCardProps>(({ dish, cafeId, cafeName, index, th
     return () => mv.removeEventListener('ar-status', onArStatus);
   }, [isLaunching, modelLoaded]);
 
+  // Drive the inline loading indicator from model-viewer's real download/decode progress.
+  // Re-bind when the element (re)mounts — gated by slot grant / launch / reload-key.
+  useEffect(() => {
+    const mv = modelViewerRef.current;
+    if (!mv) return;
+    const onProgress = (e: Event) => {
+      const p = (e as CustomEvent).detail?.totalProgress;
+      if (typeof p === 'number') setInlineProgress(p);
+    };
+    mv.addEventListener('progress', onProgress);
+    return () => mv.removeEventListener('progress', onProgress);
+  }, [hasViewerSlot, isLaunching, pendingARLaunch, mvReloadKey]);
+
   // ── WebGL context-loss recovery ──
   // model-viewer shares ONE WebGL context across every preview on the page. When it's lost
   // (GPU memory pressure after several models, or the OS reclaiming GPU memory while
@@ -485,6 +502,7 @@ export const DishCard = memo<DishCardProps>(({ dish, cafeId, cafeName, index, th
       lastRecoverRef.current = now;
       setMvLoaded(false);
       setModelLoaded(false);
+      setInlineProgress(0);
       setMvReloadKey(k => k + 1);
     };
     window.addEventListener('at-webgl-recover', onRecover);
@@ -986,7 +1004,9 @@ export const DishCard = memo<DishCardProps>(({ dish, cafeId, cafeName, index, th
                   }}
                   orientation={getModelRotation(dish.id, dish.rotation)}
                   className="w-full h-full bg-transparent"
-                  style={{ '--poster-color': 'transparent' } as any}
+                  // Fade the model in once it's ready so it doesn't pop in abruptly over the
+                  // loading state. It still loads/decodes while transparent (opacity ≠ display).
+                  style={{ '--poster-color': 'transparent', opacity: mvLoaded ? 1 : 0, transition: 'opacity 500ms ease' } as any}
                 >
                   <button slot="ar-button" className="hidden" />
                   {/* Surface detection guidance shown inside WebXR AR session */}
@@ -1013,6 +1033,55 @@ export const DishCard = memo<DishCardProps>(({ dish, cafeId, cafeName, index, th
                     Move phone slowly to detect surface
                   </div>
                 </model-viewer>
+
+                {/* Inline preview loader — concrete progress + spinner so the streaming model
+                    never reads as a broken/empty tile. Fades out as the model fades in. */}
+                <AnimatePresence>
+                  {!mvLoaded && (
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 0.4 }}
+                      className="absolute inset-0 z-[3] flex flex-col items-center justify-center gap-3 pointer-events-none"
+                    >
+                      {modelLoadingState === 'error' ? (
+                        // Genuine load failure — never leave the spinner running (that reads as
+                        // broken). AR still works: "View in AR" fetches the model independently.
+                        <>
+                          <Scan className="w-7 h-7 text-white/25" />
+                          <p className="font-mono text-[9px] tracking-[0.32em] uppercase text-white/40">Preview unavailable</p>
+                          <p className="text-[10px] text-white/30">Tap “View in AR” below</p>
+                        </>
+                      ) : (
+                        <>
+                          <motion.div
+                            animate={{ rotate: 360 }}
+                            transition={{ duration: 2.4, repeat: Infinity, ease: 'linear' }}
+                          >
+                            <Scan className="w-7 h-7" style={{ color: `rgba(${t.accentRgb}, 0.85)` }} />
+                          </motion.div>
+                          <p className="font-mono text-[9px] tracking-[0.32em] uppercase text-white/50">
+                            {inlineProgress > 0 && inlineProgress < 1
+                              ? `Loading preview · ${Math.round(inlineProgress * 100)}%`
+                              : 'Loading 3D preview'}
+                          </p>
+                          <div className="w-24 h-1 rounded-full overflow-hidden bg-white/10">
+                            <div
+                              className="h-full rounded-full"
+                              style={{
+                                width: `${Math.max(8, inlineProgress * 100)}%`,
+                                background: `rgb(${t.accentRgb})`,
+                                boxShadow: `0 0 10px rgba(${t.accentRgb}, 0.5)`,
+                                transition: 'width 220ms ease',
+                              }}
+                            />
+                          </div>
+                        </>
+                      )}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
             ) : (
               <div
