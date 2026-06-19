@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { ChevronDown, Search, X, Leaf, Flame, Scan, Clock, ArrowUp } from 'lucide-react';
 import { getThemeColors } from '../themeConfig';
 import { getOrderedCategories } from '../config/categoryOrder';
+import { loadMenuState, saveMenuState } from '../utils/menuState';
 
 interface MenuGridProps {
   dishes: Dish[];
@@ -63,12 +64,28 @@ export const MenuGrid: React.FC<MenuGridProps> = ({
     }, {} as Record<string, Dish[]>);
   }, [dishes, categories]);
 
-  const [activeCategory, setActiveCategory] = useState<string>(categories[0] || '');
-  const [expandedCategories, setExpandedCategories] = useState<string[]>(
-    categories.length > 0 ? [categories[0]] : []
-  );
-  const [query, setQuery] = useState('');
-  const [activeFilters, setActiveFilters] = useState<Set<FilterKey>>(new Set());
+  // Restore the guest's browsing context (category / filters / search / scroll) if they're
+  // returning to this cafe in the same tab — e.g. back from "View in AR" after a reload, or
+  // after the post-deploy chunk reload. Read once; the lazy initializers below seed state from
+  // it synchronously so the correct content paints on the very first frame (scroll restore
+  // then lands on the right height). Validated against the live category list.
+  const persisted = React.useMemo(() => loadMenuState(cafeId), [cafeId]);
+
+  const [activeCategory, setActiveCategory] = useState<string>(() => {
+    const p = persisted?.activeCategory;
+    return p && categories.includes(p) ? p : (categories[0] || '');
+  });
+  const [expandedCategories, setExpandedCategories] = useState<string[]>(() => {
+    const p = persisted?.expandedCategories?.filter(c => categories.includes(c));
+    if (p && p.length > 0) return p;
+    return categories.length > 0 ? [categories[0]] : [];
+  });
+  const [query, setQuery] = useState(() => persisted?.query ?? '');
+  const [activeFilters, setActiveFilters] = useState<Set<FilterKey>>(() => {
+    const valid: FilterKey[] = ['veg', 'spicy', 'ar'];
+    const p = (persisted?.filters ?? []).filter((f): f is FilterKey => valid.includes(f as FilterKey));
+    return new Set(p);
+  });
   const inputRef = useRef<HTMLInputElement>(null);
 
   const availableFilters = React.useMemo<FilterKey[]>(() => {
@@ -140,11 +157,68 @@ export const MenuGrid: React.FC<MenuGridProps> = ({
     if (categories.length > 0 && !activeCategory) setActiveCategory(categories[0]);
   }, [categories]);
 
-  // Auto-select open-now category on load for Mayanagri
+  // Auto-select open-now category on load for Mayanagri — but never override a category the
+  // guest had already chosen and that we just restored, or we'd yank them off their spot.
   useEffect(() => {
+    if (persisted?.activeCategory) return;
     if (isMayanagri && openNowCategories.length > 0 && categories.includes(openNowCategories[0])) {
       setActiveCategory(openNowCategories[0]);
     }
+  }, []);
+
+  // ── Persist browsing context ──
+  // uiStateRef always holds the latest non-scroll context so the scroll/visibility listeners
+  // below can snapshot it together with the current scrollTop without re-subscribing.
+  const uiStateRef = useRef({ filters: [] as string[], query, activeCategory, expandedCategories });
+  uiStateRef.current = { filters: [...activeFilters], query, activeCategory, expandedCategories };
+
+  // Save whenever the category / filters / search change (cheap; sessionStorage write).
+  useEffect(() => {
+    const root = document.getElementById('root');
+    saveMenuState(cafeId, { ...uiStateRef.current, scrollTop: root?.scrollTop ?? 0 });
+  }, [cafeId, activeFilters, query, activeCategory, expandedCategories]);
+
+  // Save scroll position (throttled) and flush a final snapshot right before the page is
+  // hidden/unloaded — this is the snapshot that survives a Scene-Viewer bounce, an AR return,
+  // a post-deploy reload or a tab crash.
+  useEffect(() => {
+    const root = document.getElementById('root');
+    if (!root) return;
+    let last = 0;
+    const flush = () => saveMenuState(cafeId, { ...uiStateRef.current, scrollTop: root.scrollTop });
+    const onScroll = () => {
+      const now = Date.now();
+      if (now - last < 200) return;
+      last = now;
+      flush();
+    };
+    const onHide = () => { if (document.visibilityState === 'hidden') flush(); };
+    root.addEventListener('scroll', onScroll, { passive: true });
+    document.addEventListener('visibilitychange', onHide);
+    window.addEventListener('pagehide', flush);
+    return () => {
+      root.removeEventListener('scroll', onScroll);
+      document.removeEventListener('visibilitychange', onHide);
+      window.removeEventListener('pagehide', flush);
+    };
+  }, [cafeId]);
+
+  // Restore scroll position on mount (the reload paths above remount this subtree). The
+  // restored filters/category already seeded the same content synchronously, so the page has
+  // its prior height and this lands accurately. Reapply for a few frames to beat the browser's
+  // own scroll reset on the overflow:auto #root container. Runs once.
+  useEffect(() => {
+    const target = persisted?.scrollTop ?? 0;
+    if (target <= 0) return;
+    const root = document.getElementById('root');
+    if (!root) return;
+    let frames = 0;
+    const reapply = () => {
+      if (Math.abs(root.scrollTop - target) > 1) root.scrollTop = target;
+      if (++frames < 16) requestAnimationFrame(reapply);
+    };
+    requestAnimationFrame(reapply);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const FILTER_META: Record<FilterKey, { label: string; icon: React.ReactNode }> = {

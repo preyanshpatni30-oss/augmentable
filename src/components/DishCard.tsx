@@ -216,6 +216,11 @@ export const DishCard = memo<DishCardProps>(({ dish, cafeId, cafeName, index, th
   // this, every preview stays permanently black even though three.js can restore the context.
   const [mvReloadKey, setMvReloadKey] = useState(0);
   const lastRecoverRef = useRef(0);
+  // Cleanup for the in-flight Android Scene-Viewer attempt (hashchange/visibilitychange/timer).
+  // Held in a ref so it also runs if the card unmounts mid-attempt — otherwise those window/
+  // document listeners would leak every time a guest taps "View in AR" then scrolls the card
+  // out of the AR-filtered list before the attempt settled.
+  const arAttemptCleanupRef = useRef<null | (() => void)>(null);
   // Whether the viewer pool has granted this card a slot to mount its 3D preview. Bounds how
   // many <model-viewer>s are alive at once so a long AR-filtered list can't exhaust GPU memory.
   const [hasViewerSlot, setHasViewerSlot] = useState(false);
@@ -486,6 +491,36 @@ export const DishCard = memo<DishCardProps>(({ dish, cafeId, cafeName, index, th
     return () => window.removeEventListener('at-webgl-recover', onRecover);
   }, []);
 
+  // Run any in-flight Scene-Viewer attempt cleanup if the card unmounts before it settles,
+  // so its hashchange/visibilitychange/timer never outlive the component.
+  useEffect(() => () => { arAttemptCleanupRef.current?.(); }, []);
+
+  // ── Hardware / browser Back closes the in-page 3D viewer ──
+  // The fullscreen 3D fallback (shown when Scene Viewer can't open — e.g. no ARCore) is a
+  // portal overlay, not a route, so without this a Back press would pop the page's history
+  // (potentially leaving the menu entirely) instead of just closing the viewer. Push a marker
+  // entry while it's open; a Back navigation pops it and closes the viewer, returning the guest
+  // to the exact menu spot underneath (which never scrolled). The × button routes through the
+  // same pop so there's only one close path.
+  useEffect(() => {
+    if (!show3DFallback) return;
+    // Idempotent: don't stack a second entry if one is already on top (React StrictMode
+    // double-invokes this effect in dev).
+    if (!window.history.state?.atFallback3D) {
+      window.history.pushState({ atFallback3D: true }, '');
+    }
+    const onPop = () => setShow3DFallback(false);
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, [show3DFallback]);
+
+  const close3DFallback = useCallback(() => {
+    // Prefer popping our own pushed entry so history stays clean; fall back to a direct close
+    // if for any reason that entry isn't on top.
+    if (window.history.state?.atFallback3D) window.history.back();
+    else setShow3DFallback(false);
+  }, []);
+
   // Safety net so the "Preparing your dish in AR" overlay can never stick. When the native
   // AR view opens, the page is hidden — dismiss shortly after. As a last resort, time it out.
   useEffect(() => {
@@ -557,6 +592,7 @@ export const DishCard = memo<DishCardProps>(({ dish, cafeId, cafeName, index, th
         window.removeEventListener('hashchange', onHashChange);
         document.removeEventListener('visibilitychange', onVisibility);
         clearTimeout(failTimer);
+        arAttemptCleanupRef.current = null;
       };
       const showFallback3D = () => {
         if (settled) return;
@@ -586,6 +622,7 @@ export const DishCard = memo<DishCardProps>(({ dish, cafeId, cafeName, index, th
       const failTimer = setTimeout(showFallback3D, 2500);
       window.addEventListener('hashchange', onHashChange);
       document.addEventListener('visibilitychange', onVisibility);
+      arAttemptCleanupRef.current = cleanup;
       return;
     }
 
@@ -808,7 +845,7 @@ export const DishCard = memo<DishCardProps>(({ dish, cafeId, cafeName, index, th
                 <h4 className="text-lg font-serif italic text-white truncate">{dish.name}</h4>
               </div>
               <button
-                onClick={() => setShow3DFallback(false)}
+                onClick={close3DFallback}
                 aria-label="Close 3D view"
                 className="p-3 rounded-full bg-white/10 border border-white/20 text-white shrink-0 active:scale-95"
               >
