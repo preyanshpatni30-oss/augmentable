@@ -24,9 +24,11 @@ function computeMax(): number {
   // Android WebView accumulates GPU textures faster than iOS WebKit, so Android gets a
   // hard cap of 1 (one live preview at a time). iOS WebKit handles its own memory pressure
   // better, but low-memory iPhones still need a tighter cap.
-  const isAndroid = /Android/i.test(ua);
-  if (isAndroid) return 1;
-  if (isMobile) return 2; // iOS: 2 across the board — GPU strength can't be inferred from RAM alone
+  // All phones (iOS included) get ONE live preview at a time. Even high-end iPhones OOM-crashed
+  // on the AR-Only filter when several <model-viewer> WebGL previews were alive while scrolling
+  // the long list; AR itself launches in Quick Look / Scene Viewer, so a single in-page poster
+  // preview is all that's ever needed. Desktop keeps a generous cap.
+  if (isMobile) return 1;
   if (typeof mem === 'number' && mem <= 4) return 6;
   return 12;
 }

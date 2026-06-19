@@ -48,3 +48,32 @@ export function clearMenuState(cafeId: string | undefined | null): void {
     /* ignore */
   }
 }
+
+// ── Crash-loop breaker ──
+// Restoring the saved context (filters + scroll) is great for a normal return from AR, but if a
+// device OOM-crashes while rendering the menu, the reload would restore the exact same heavy
+// state and crash again — an infinite reload loop. We record load timestamps in localStorage
+// (which, unlike sessionStorage, survives an OOM tab crash) and, if the page has reloaded too
+// many times in a few seconds, report a loop so the caller starts from a clean, light menu
+// instead. Counted once per real page load.
+const LOADS_KEY = 'at-menu-loads';
+let loadCounted = false;
+let loopDetected = false;
+
+export function registerLoadAndDetectLoop(): boolean {
+  if (loadCounted) return loopDetected;
+  loadCounted = true;
+  try {
+    const now = Date.now();
+    const raw = localStorage.getItem(LOADS_KEY);
+    const loads: number[] = raw ? JSON.parse(raw) : [];
+    const recent = loads.filter(t => typeof t === 'number' && now - t < 7000);
+    recent.push(now);
+    localStorage.setItem(LOADS_KEY, JSON.stringify(recent.slice(-6)));
+    // 3+ loads within 7s is not normal navigation — treat as a crash/reload loop.
+    loopDetected = recent.length >= 3;
+  } catch {
+    loopDetected = false;
+  }
+  return loopDetected;
+}

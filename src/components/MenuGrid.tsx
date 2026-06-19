@@ -5,7 +5,8 @@ import { motion, AnimatePresence } from 'motion/react';
 import { ChevronDown, Search, X, Leaf, Flame, Scan, Clock, ArrowUp } from 'lucide-react';
 import { getThemeColors } from '../themeConfig';
 import { getOrderedCategories } from '../config/categoryOrder';
-import { loadMenuState, saveMenuState } from '../utils/menuState';
+import { loadMenuState, saveMenuState, clearMenuState, registerLoadAndDetectLoop } from '../utils/menuState';
+import { LazyMount } from './LazyMount';
 
 interface MenuGridProps {
   dishes: Dish[];
@@ -69,7 +70,15 @@ export const MenuGrid: React.FC<MenuGridProps> = ({
   // after the post-deploy chunk reload. Read once; the lazy initializers below seed state from
   // it synchronously so the correct content paints on the very first frame (scroll restore
   // then lands on the right height). Validated against the live category list.
-  const persisted = React.useMemo(() => loadMenuState(cafeId), [cafeId]);
+  const persisted = React.useMemo(() => {
+    // If the page is caught in a crash/reload loop, don't restore the (heavy) saved state —
+    // clear it and start from a clean, light menu so the device can recover.
+    if (registerLoadAndDetectLoop()) {
+      clearMenuState(cafeId);
+      return null;
+    }
+    return loadMenuState(cafeId);
+  }, [cafeId]);
 
   const [activeCategory, setActiveCategory] = useState<string>(() => {
     const p = persisted?.activeCategory;
@@ -405,14 +414,15 @@ export const MenuGrid: React.FC<MenuGridProps> = ({
             ) : (
               <div className="grid grid-cols-1 gap-6">
                 {filteredDishes.map((dish, index) => (
-                  <DishCard
-                    key={dish.id}
-                    dish={dish}
-                    cafeId={cafeId}
-                    cafeName={cafeName}
-                    index={index}
-                    themeColor={themeColor}
-                  />
+                  <LazyMount key={dish.id}>
+                    <DishCard
+                      dish={dish}
+                      cafeId={cafeId}
+                      cafeName={cafeName}
+                      index={index}
+                      themeColor={themeColor}
+                    />
+                  </LazyMount>
                 ))}
               </div>
             )}
@@ -452,14 +462,15 @@ export const MenuGrid: React.FC<MenuGridProps> = ({
 
               <div className="grid grid-cols-1 gap-6">
                 {(groupedDishes[activeCategory] || []).map((dish, index) => (
-                  <DishCard
-                    key={dish.id}
-                    dish={dish}
-                    cafeId={cafeId}
-                    cafeName={cafeName}
-                    index={index}
-                    themeColor={themeColor}
-                  />
+                  <LazyMount key={dish.id}>
+                    <DishCard
+                      dish={dish}
+                      cafeId={cafeId}
+                      cafeName={cafeName}
+                      index={index}
+                      themeColor={themeColor}
+                    />
+                  </LazyMount>
                 ))}
               </div>
             </motion.div>
