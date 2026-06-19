@@ -474,17 +474,29 @@ export const DishCard = memo<DishCardProps>(({ dish, cafeId, cafeName, index, th
     return () => mv.removeEventListener('ar-status', onArStatus);
   }, [isLaunching, modelLoaded]);
 
-  // Drive the inline loading indicator from model-viewer's real download/decode progress.
-  // Re-bind when the element (re)mounts — gated by slot grant / launch / reload-key.
+  // Drive the inline loading indicator from model-viewer's real progress, and — crucially —
+  // detect "loaded" reliably. A cached/instant model can fire its `load` event before React's
+  // declarative onLoad attaches, so we also check the element's own `.loaded` flag on bind;
+  // without this the loader would never dismiss. Re-binds when the element (re)mounts.
   useEffect(() => {
     const mv = modelViewerRef.current;
     if (!mv) return;
+    const markLoaded = () => { setMvLoaded(true); setModelLoaded(true); };
+    if ((mv as any).loaded) markLoaded();
     const onProgress = (e: Event) => {
       const p = (e as CustomEvent).detail?.totalProgress;
       if (typeof p === 'number') setInlineProgress(p);
+      // totalProgress reaching 1 is model-viewer's own "fully loaded" signal — a belt-and-
+      // braces dismissal in case the `load` event was missed.
+      if (p >= 1) markLoaded();
     };
+    const onLoad = () => markLoaded();
     mv.addEventListener('progress', onProgress);
-    return () => mv.removeEventListener('progress', onProgress);
+    mv.addEventListener('load', onLoad);
+    return () => {
+      mv.removeEventListener('progress', onProgress);
+      mv.removeEventListener('load', onLoad);
+    };
   }, [hasViewerSlot, isLaunching, pendingARLaunch, mvReloadKey]);
 
   // ── WebGL context-loss recovery ──
@@ -1004,9 +1016,11 @@ export const DishCard = memo<DishCardProps>(({ dish, cafeId, cafeName, index, th
                   }}
                   orientation={getModelRotation(dish.id, dish.rotation)}
                   className="w-full h-full bg-transparent"
-                  // Fade the model in once it's ready so it doesn't pop in abruptly over the
-                  // loading state. It still loads/decodes while transparent (opacity ≠ display).
-                  style={{ '--poster-color': 'transparent', opacity: mvLoaded ? 1 : 0, transition: 'opacity 500ms ease' } as any}
+                  // NEVER gate the model's visibility on our own React state — model-viewer's
+                  // `load` event can fire before React attaches onLoad (cached/instant models),
+                  // which would leave the model permanently hidden. model-viewer's own reveal
+                  // handles a smooth fade-in; the overlay below covers the pre-load gap.
+                  style={{ '--poster-color': 'transparent' } as any}
                 >
                   <button slot="ar-button" className="hidden" />
                   {/* Surface detection guidance shown inside WebXR AR session */}
