@@ -8,6 +8,7 @@
     "prebuild": "node scripts/verifyArModels.mjs",
     "build": "vite build",
     "verify:models": "node scripts/verifyArModels.mjs",
+    "optimize:models": "node scripts/optimizeModels.mjs",
     "preview": "vite preview --host=0.0.0.0",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit"
